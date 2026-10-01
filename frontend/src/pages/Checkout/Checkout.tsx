@@ -263,18 +263,33 @@ export default function CheckoutPage() {
             <CheckoutSection number="3" title="Payment Method" caption="Select your preferred payment channel in Rwanda.">
               <div className="grid gap-3 sm:grid-cols-3">
                 {[
-                  { id: 'Mobile Money', name: 'MTN / Airtel MoMo', icon: '📱' },
-                  { id: 'Card Payment', name: 'Credit / Debit Card', icon: '💳' },
-                  { id: 'Cash on Delivery', name: 'Cash on Delivery', icon: '💵' },
+                  {
+                    id: 'Mobile Money',
+                    name: 'MTN / Airtel MoMo',
+                    subtitle: 'Instant MoMo prompt',
+                    icon: '📱',
+                  },
+                  {
+                    id: 'Card Payment',
+                    name: 'Credit / Debit Card',
+                    subtitle: 'Visa, Mastercard',
+                    icon: '💳',
+                  },
+                  {
+                    id: 'Cash on Delivery',
+                    name: 'Cash on Delivery',
+                    subtitle: 'Pay rider on delivery',
+                    icon: '💵',
+                  },
                 ].map((pm) => {
                   const isSelected = paymentChoice === pm.id
                   return (
                     <label
                       key={pm.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-all ${
+                      className={`relative flex cursor-pointer flex-col justify-between rounded-2xl border p-4 transition-all duration-200 ${
                         isSelected
-                          ? 'border-[#2f7a4f] bg-[#edf6ee] ring-2 ring-[#2f7a4f]/20 shadow-sm'
-                          : 'border-[#dfe7e2] bg-white hover:border-[#2f7a4f]/50'
+                          ? 'border-[#2f7a4f] bg-[#edf6ee] ring-2 ring-[#2f7a4f]/25 shadow-sm'
+                          : 'border-[#dfe7e2] bg-white hover:border-[#2f7a4f]/50 hover:bg-[#fafdfa]'
                       }`}
                     >
                       <input
@@ -283,11 +298,25 @@ export default function CheckoutPage() {
                         value={pm.id}
                         checked={isSelected}
                         onChange={(e) => setPaymentChoice(e.target.value)}
-                        className="accent-[#2f7a4f]"
+                        className="sr-only"
                       />
                       <div>
-                        <span className="text-lg">{pm.icon}</span>
-                        <p className="font-syne text-xs font-bold text-[#16231a]">{pm.name}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl shadow-xs border border-[#e2eae4]">
+                            {pm.icon}
+                          </span>
+                          <span
+                            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black transition ${
+                              isSelected
+                                ? 'bg-[#2f7a4f] text-white shadow-xs'
+                                : 'border border-[#ccd8cf] bg-white text-transparent'
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        </div>
+                        <p className="mt-3 font-syne text-sm font-black text-[#16231a]">{pm.name}</p>
+                        <p className="mt-0.5 text-xs text-[#5a6762]">{pm.subtitle}</p>
                       </div>
                     </label>
                   )
