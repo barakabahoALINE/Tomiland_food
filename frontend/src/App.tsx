@@ -1,5 +1,5 @@
 import './App.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAppSelector, useAppDispatch } from './store/hooks'
 import { restoreSession } from './store/slices/auth/authSlice'
@@ -13,6 +13,8 @@ import HowItWorksPage from './pages/HowItWorks/HowItWorks'
 import AccountPage from './pages/Account/Account'
 import PageFooter from './components/PageFooter'
 import AdminDashboardPage, { AdminOrdersPage, AdminSectionPage } from './pages/Admin/AdminDashboard'
+import { getSavedCart, saveCart } from './data/shopApi'
+import { replaceItems } from './store/slices/cart/cartSlice'
 
 function PageWithFooter({ children }: { children: React.ReactNode }) {
   return (
@@ -42,11 +44,36 @@ function RequireAuth({ children, adminOnly = false }: { children: React.ReactNod
 
 function App() {
   const dispatch = useAppDispatch()
+  const { accessToken } = useAppSelector((state) => state.auth)
+  const cartItems = useAppSelector((state) => state.cart.items)
+  const [cartLoadedFor, setCartLoadedFor] = useState<string | null>(null)
 
   // On app mount: try to restore session from stored JWT tokens
   useEffect(() => {
     void dispatch(restoreSession())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!accessToken) {
+      setCartLoadedFor(null)
+      return
+    }
+    let active = true
+    void getSavedCart(accessToken).then((items) => {
+      if (!active) return
+      dispatch(replaceItems(items))
+      setCartLoadedFor(accessToken)
+    }).catch(() => {
+      if (active) setCartLoadedFor(accessToken)
+    })
+    return () => { active = false }
+  }, [accessToken, dispatch])
+
+  useEffect(() => {
+    if (accessToken && cartLoadedFor === accessToken) {
+      void saveCart(cartItems, accessToken).catch(() => undefined)
+    }
+  }, [accessToken, cartItems, cartLoadedFor])
 
   return (
     <BrowserRouter>

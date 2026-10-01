@@ -4,6 +4,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string | null;
+  packaging?: string;
   restaurantId?: string | null;
   notes?: string;
 }

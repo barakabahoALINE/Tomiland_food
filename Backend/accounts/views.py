@@ -46,7 +46,7 @@ class RegisterView(generics.CreateAPIView):
         except ValidationError as exc:
             return Response(build_error_response(str(exc), status=400)[0], status=400)
 
-        return Response(build_success_response('Registration successful. Verification required.', {
+        return Response(build_success_response('Registration successful. Please check your email for a verification code.', {
             'user': {
                 'id': user.id,
                 'email': user.email,
@@ -64,10 +64,25 @@ class LoginView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
-        login(request, user)
-        token_serializer = TokenObtainSerializer(data={'email': user.email, 'password': request.data['password']})
-        token_serializer.is_valid(raise_exception=True)
-        return Response(build_success_response('Login successful.', token_serializer.validated_data)[0], status=200)
+        
+        refresh = RefreshToken.for_user(user)
+        refresh['email'] = user.email
+        refresh['role'] = user.role
+        refresh['is_verified'] = user.is_verified
+
+        data = {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'is_verified': user.is_verified,
+            }
+        }
+        return Response(build_success_response('Login successful.', data)[0], status=200)
 
 
 class LogoutView(generics.GenericAPIView):

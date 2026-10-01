@@ -27,11 +27,16 @@ const clearTokens = () => {
 };
 
 // ─── Initial state ────────────────────────────────────────────────────────────
+const storedAccess  = localStorage.getItem(ACCESS_KEY);
+const storedRefresh = localStorage.getItem(REFRESH_KEY);
+
 const initialState: AuthState = {
   user: null,
-  accessToken: localStorage.getItem(ACCESS_KEY),
-  refreshToken: localStorage.getItem(REFRESH_KEY),
-  isAuthenticated: false,
+  accessToken: storedAccess,
+  refreshToken: storedRefresh,
+  // Mark as authenticated optimistically when tokens exist.
+  // restoreSession() will validate them on mount and clear if invalid.
+  isAuthenticated: Boolean(storedAccess && storedRefresh),
   pendingVerification: false,
   pendingEmail: null,
   status: 'idle',

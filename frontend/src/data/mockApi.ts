@@ -41,6 +41,7 @@ export type Market = {
   rating: number
   location: string
   image: string
+  city?: string
 }
 
 export type Category = {

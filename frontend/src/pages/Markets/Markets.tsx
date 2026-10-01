@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../../components/Header/Header'
+import { getMarkets } from '../../data/shopApi'
 
 type Market = {
   id: string
@@ -23,94 +24,18 @@ type Market = {
   priceLevel: 'Budget Friendly' | 'Moderate' | 'Premium'
 }
 
-const placeholder = (label: string, width = 500, height = 340) =>
-  `https://placehold.co/${width}x${height}/edf6ee/1c3f33?text=${encodeURIComponent(label)}`
-
-const markets: Market[] = [
-  {
-    id: 'kimironko',
-    name: 'Kimironko Market',
-    type: 'Local Market',
-    area: 'Kimironko',
-    city: 'Kigali',
-    image: placeholder('Kimironko Market'),
-    rating: 4.6,
-    reviews: 320,
-    distance: '1.8 km away',
-    isOpen: true,
-    closesAt: '8:00 PM',
-    itemsAvailable: 7,
-    totalItems: 12,
-    services: ['Delivery', 'Pick up later'],
-    estimatedBasket: '22,800 RWF',
-    delivery: 'Available',
-    pickup: 'Available later',
-    priceLevel: 'Moderate',
-  },
-  {
-    id: 'nyabugogo',
-    name: 'Nyabugogo Market',
-    type: 'Local Market',
-    area: 'Nyabugogo',
-    city: 'Kigali',
-    image: placeholder('Nyabugogo Market'),
-    rating: 4.4,
-    reviews: 286,
-    distance: '4.5 km away',
-    isOpen: true,
-    closesAt: '6:30 PM',
-    itemsAvailable: 5,
-    totalItems: 12,
-    services: ['Pick up later'],
-    estimatedBasket: '21,700 RWF',
-    delivery: 'Unavailable',
-    pickup: 'Available later',
-    priceLevel: 'Budget Friendly',
-  },
-  {
-    id: 'gisozi',
-    name: 'Gisozi Fresh Market',
-    type: 'Local Market',
-    area: 'Gisozi',
-    city: 'Kigali',
-    image: placeholder('Gisozi Market'),
-    rating: 4.7,
-    reviews: 418,
-    distance: '2.9 km away',
-    isOpen: false,
-    closesAt: 'Closed',
-    itemsAvailable: 4,
-    totalItems: 12,
-    services: ['Delivery', 'Pick up now'],
-    estimatedBasket: '23,400 RWF',
-    delivery: 'Available',
-    pickup: 'Open now',
-    priceLevel: 'Premium',
-  },
-  {
-    id: 'remera',
-    name: 'Remera Local Market',
-    type: 'Local Market',
-    area: 'Remera',
-    city: 'Kigali',
-    image: placeholder('Remera Market'),
-    rating: 4.5,
-    reviews: 332,
-    distance: '3.1 km away',
-    isOpen: true,
-    closesAt: '7:30 PM',
-    itemsAvailable: 8,
-    totalItems: 12,
-    services: ['Delivery', 'Pick up now', 'Pick up later'],
-    estimatedBasket: '24,100 RWF',
-    delivery: 'Available',
-    pickup: 'Available',
-    priceLevel: 'Moderate',
-  },
-]
-
 export default function MarketsPage() {
   const navigate = useNavigate()
+  const [markets, setMarkets] = useState<Market[]>([])
+
+  useEffect(() => {
+    void getMarkets().then((rows) => setMarkets(rows.map((market) => ({
+      ...market, id: String(market.id), type: 'Local Market' as const, area: market.location.split(',')[0] || market.name,
+      city: market.city || 'Kigali', reviews: 0, distance: '0 km away', isOpen: true, closesAt: 'Open today',
+      itemsAvailable: 0, totalItems: 0, services: ['Delivery', 'Pick up later'], estimatedBasket: '0 RWF',
+      delivery: 'Available', pickup: 'Available', priceLevel: 'Moderate' as const,
+    })))).catch(() => setMarkets([]))
+  }, [])
   const [search, setSearch] = useState('')
   const [selectedType, setSelectedType] = useState<'All' | 'Local Market'>('All')
   const [selectedMarketId, setSelectedMarketId] = useState('kimironko')
@@ -177,7 +102,7 @@ export default function MarketsPage() {
     })
   }, [maxDistance, minimumRating, openNowOnly, search, selectedPrice, selectedServices, selectedType, sortBy])
 
-  const selectedMarket = filteredMarkets.find((market) => market.id === selectedMarketId) ?? filteredMarkets[0] ?? markets[0]
+  const selectedMarket = filteredMarkets.find((market) => market.id === selectedMarketId) ?? filteredMarkets[0]
   const pageSize = 4
   const pageCount = Math.max(1, Math.ceil(filteredMarkets.length / pageSize))
   const visibleMarkets = filteredMarkets.slice((page - 1) * pageSize, page * pageSize)

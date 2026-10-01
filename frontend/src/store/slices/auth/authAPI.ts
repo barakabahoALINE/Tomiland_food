@@ -15,14 +15,16 @@ export interface AuthResponse {
 
 // ─── Helper: parse Django's { success, data, message } envelope ──────────────
 async function parseResponse<T>(res: Response): Promise<T> {
-  const body = await res.json().catch(() => ({}));
+  const body: any = await res.json().catch(() => ({}));
   if (!res.ok) {
     // Django DRF returns errors in different shapes — normalise them
+    const firstError = Object.values(body as Record<string, unknown>)[0];
+    const validationError = Array.isArray(firstError) ? firstError[0] : firstError;
     const detail =
       body?.message ??
       body?.detail ??
       body?.non_field_errors?.[0] ??
-      Object.values(body ?? {})?.[0]?.[0] ??
+      validationError ??
       `Request failed (${res.status})`;
     throw new Error(String(detail));
   }
@@ -71,7 +73,7 @@ export const loginUserRequest = async (payload: LoginPayload): Promise<AuthRespo
 
 // ─── REGISTER ─────────────────────────────────────────────────────────────────
 export const registerUserRequest = async (payload: RegisterPayload): Promise<{ userId: string; email: string }> => {
-  // Backend expects: email, phone_number, password, first_name, last_name
+  // Backend expects: email, phone_number, password, confirm_password, first_name, last_name
   const [first_name = '', ...rest] = (payload.name ?? '').split(' ');
   const last_name = rest.join(' ');
 
@@ -81,6 +83,7 @@ export const registerUserRequest = async (payload: RegisterPayload): Promise<{ u
     body: JSON.stringify({
       email: payload.email,
       password: payload.password,
+      confirm_password: payload.password,
       phone_number: payload.phone_number ?? '',
       first_name,
       last_name,

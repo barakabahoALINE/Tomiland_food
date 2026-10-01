@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useAppDispatch } from '../../store/hooks'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { addItem } from '../../store/slices/cart/cartSlice'
-import { getProductsData, type ProductsData, type Product } from '../../data/mockApi'
+import type { ProductsData, Product } from '../../data/mockApi'
+import { getProducts, saveCart } from '../../data/shopApi'
 import Header from '../../components/Header/Header'
 
 type FilterState = {
@@ -28,10 +29,13 @@ export default function ProductsPage() {
   const [selectedPackaging, setSelectedPackaging] = useState<{ [key: string]: string }>({})
   const [quantity, setQuantity] = useState<{ [key: string]: number }>({})
   const dispatch = useAppDispatch()
+  const { accessToken } = useAppSelector((state) => state.auth)
+  const cartItems = useAppSelector((state) => state.cart.items)
 
   useEffect(() => {
     const loadProducts = async () => {
-      const productsData = await getProductsData()
+      try {
+      const productsData = await getProducts()
       setData(productsData)
       // Initialize packaging and quantity
       const packagingMap: { [key: string]: string } = {}
@@ -44,6 +48,9 @@ export default function ProductsPage() {
       })
       setSelectedPackaging(packagingMap)
       setQuantity(quantityMap)
+      } catch {
+        setData({ featured: [], categories: [], summary: { totalProducts: 0, availableToday: 'Unavailable' } })
+      }
     }
     void loadProducts()
   }, [])
@@ -89,13 +96,22 @@ export default function ProductsPage() {
   const subcategories = Array.from(new Set(data.featured.filter((p) => p.category === filters.category).map((p) => p.subcategory)))
 
   const handleAddToCart = (product: Product, pkg: string, qty: number) => {
-    dispatch(addItem({
-      id: `${product.id}-${pkg}`,
+    const item = {
+      id: product.id,
       name: `${product.name}${product.kinyarwandaName ? ` / ${product.kinyarwandaName}` : ''} (${pkg})`,
       price: parseInt(product.price),
       quantity: qty,
       imageUrl: product.image,
-    }))
+      packaging: pkg,
+    }
+    dispatch(addItem(item))
+    if (accessToken) {
+      const existing = cartItems.find((entry) => entry.id === item.id && entry.packaging === pkg)
+      const updated = existing
+        ? cartItems.map((entry) => entry === existing ? { ...entry, quantity: entry.quantity + qty } : entry)
+        : [...cartItems, item]
+      void saveCart(updated, accessToken).catch((error: unknown) => console.error('Could not save basket:', error))
+    }
   }
 
   return (

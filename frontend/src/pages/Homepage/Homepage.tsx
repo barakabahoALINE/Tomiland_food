@@ -5,9 +5,10 @@ import { getHomepageData, type HomepageData } from './mockApi'
 import Header from '../../components/Header/Header'
 
 /* ─── Scroll-reveal hook ─────────────────────────────────────────────────── */
-function useReveal() {
+function useReveal(active: boolean) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!active) return
     const el = ref.current
     if (!el) return
     const obs = new IntersectionObserver(
@@ -16,7 +17,7 @@ function useReveal() {
     )
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [active])
   return ref
 }
 
@@ -70,14 +71,15 @@ export default function Homepage() {
   const navigate = useNavigate()
   const [data, setData] = useState<HomepageData | null>(null)
 
-  const heroRef    = useReveal()
-  const statsRef   = useReveal()
-  const catsRef    = useReveal()
-  const smartRef   = useReveal()
-  const picksRef   = useReveal()
-  const marketsRef = useReveal()
-  const perksRef   = useReveal()
-  const ctaRef     = useReveal()
+  const contentReady = Boolean(data)
+  const heroRef    = useReveal(contentReady)
+  const statsRef   = useReveal(contentReady)
+  const catsRef    = useReveal(contentReady)
+  const smartRef   = useReveal(contentReady)
+  const picksRef   = useReveal(contentReady)
+  const marketsRef = useReveal(contentReady)
+  const perksRef   = useReveal(contentReady)
+  const ctaRef     = useReveal(contentReady)
 
   useEffect(() => {
     void getHomepageData().then(setData)

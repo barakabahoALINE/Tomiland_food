@@ -1,29 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import logo from '../../assets/logo.png'
+import { getAdminSummary, type AdminSummary } from '../../data/shopApi'
+import { useAppSelector } from '../../store/hooks'
 
 type NavItem = {
   label: string
   route: string
   hasChildren?: boolean
 }
-
-type KpiCard = {
-  title: string
-  value: string
-  change: string
-  direction: 'up' | 'down'
-  subtitle: string
-  icon: string
-}
-
-type OrderStatus = {
-  label: string
-  count: number
-  color: string
-}
-
-type RowStatus = 'Preparing' | 'Confirmed' | 'Out for Delivery' | 'Delivered'
 
 const sidebarItems: NavItem[] = [
   { label: 'Dashboard', route: '/admin' },
@@ -40,58 +25,6 @@ const sidebarItems: NavItem[] = [
   { label: 'Settings', route: '/admin/settings', hasChildren: true },
 ]
 
-const kpis: KpiCard[] = [
-  { title: 'Total Orders', value: '128', change: '↑ 12%', direction: 'up', subtitle: 'vs. yesterday', icon: '🛒' },
-  { title: 'Total Revenue', value: '2,420,000 RWF', change: '↑ 18%', direction: 'up', subtitle: 'vs. yesterday', icon: '💰' },
-  { title: 'Pending Orders', value: '24', change: '↓ 8%', direction: 'down', subtitle: 'vs. yesterday', icon: '⏳' },
-  { title: 'Deliveries in Progress', value: '18', change: '↑ 5%', direction: 'up', subtitle: 'vs. yesterday', icon: '🚚' },
-  { title: 'New Customers', value: '32', change: '↑ 23%', direction: 'up', subtitle: 'vs. yesterday', icon: '👥' },
-  { title: 'Low Stock Products', value: '7', change: '↓ 30%', direction: 'down', subtitle: 'vs. yesterday', icon: '⚠️' },
-]
-
-const salesData = [
-  { label: 'Apr 20', value: 540 },
-  { label: 'Apr 21', value: 730 },
-  { label: 'Apr 22', value: 620 },
-  { label: 'Apr 23', value: 930 },
-  { label: 'Apr 24', value: 820 },
-  { label: 'Apr 25', value: 1180 },
-  { label: 'Apr 26', value: 1030 },
-]
-
-const orderStatusData: OrderStatus[] = [
-  { label: 'Pending', count: 24, color: '#2f7a4f' },
-  { label: 'Confirmed', count: 32, color: '#f4b942' },
-  { label: 'Preparing', count: 28, color: '#5ec4a6' },
-  { label: 'Out for Delivery', count: 18, color: '#8f69d9' },
-  { label: 'Delivered', count: 23, color: '#7ac0eb' },
-  { label: 'Cancelled', count: 4, color: '#ef6f5f' },
-]
-
-const recentOrders = [
-  { orderId: 'TM1024', customer: 'Aline Uwimana', items: 3, status: 'Preparing', total: '8,900 RWF', time: '10:12 AM' },
-  { orderId: 'TM1023', customer: 'Jean Nyonzima', items: 5, status: 'Confirmed', total: '12,400 RWF', time: '09:48 AM' },
-  { orderId: 'TM1022', customer: 'Chantal Mukamana', items: 2, status: 'Out for Delivery', total: '6,200 RWF', time: '09:32 AM' },
-  { orderId: 'TM1021', customer: 'Emmanuel Nshimyimana', items: 7, status: 'Delivered', total: '15,800 RWF', time: '08:55 AM' },
-  { orderId: 'TM1020', customer: 'Solange Iradukunda', items: 4, status: 'Preparing', total: '10,500 RWF', time: '08:21 AM' },
-] as const
-
-const lowStockProducts = [
-  { name: 'Tomatoes', stock: '8 kg', image: '🍅' },
-  { name: 'Milk (Fresh)', stock: '12 L', image: '🥛' },
-  { name: 'Chicken Breast', stock: '5 kg', image: '🍗' },
-  { name: 'Rice (Local)', stock: '3 kg', image: '🍚' },
-  { name: 'Cooking Oil', stock: '2 L', image: '🫒' },
-]
-
-const topSellingProducts = [
-  { name: 'Tomatoes', sold: '1,248 units sold', change: '↑24%', image: '🍅' },
-  { name: 'Bananas', sold: '986 units sold', change: '↑18%', image: '🍌' },
-  { name: 'Rice (Local)', sold: '842 units sold', change: '↑12%', image: '🍚' },
-  { name: 'Milk (Fresh)', sold: '756 units sold', change: '↑9%', image: '🥛' },
-  { name: 'Cooking Oil', sold: '648 units sold', change: '↑7%', image: '🫒' },
-]
-
 const quickActions = [
   { label: 'Add Product', route: '/admin/products', icon: '+' },
   { label: 'Manage Markets', route: '/admin/markets', icon: '▣' },
@@ -106,30 +39,16 @@ const notificationItems = [
   '2 customers requested delivery reschedules.',
 ]
 
-function StatusPill({ status }: { status: RowStatus }) {
-  const styles: Record<RowStatus, string> = {
-    Preparing: 'bg-[#fef4d7] text-[#a36b00]',
-    Confirmed: 'bg-[#edf6ee] text-[#2f7a4f]',
-    'Out for Delivery': 'bg-[#f0ebff] text-[#6d51be]',
-    Delivered: 'bg-[#e6f5ff] text-[#2467a5]',
-  }
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${styles[status]}`}>
-      {status}
-    </span>
-  )
-}
-
-function buildSalesPath(data: typeof salesData) {
+function buildSalesPath(data: Array<{ label: string; value: number }>) {
+  const chartData = data.length ? data : [{ label: '', value: 0 }, { label: '', value: 0 }]
   const width = 780
   const height = 230
-  const maxValue = Math.max(...data.map((item) => item.value))
-  const minValue = Math.min(...data.map((item) => item.value))
+  const maxValue = Math.max(...chartData.map((item) => item.value))
+  const minValue = Math.min(...chartData.map((item) => item.value))
   const range = Math.max(maxValue - minValue, 1)
 
-  const points = data.map((item, index) => {
-    const x = (index / (data.length - 1)) * width
+  const points = chartData.map((item, index) => {
+    const x = (index / (chartData.length - 1)) * width
     const y = height - ((item.value - minValue) / range) * (height - 28) - 18
     return { x, y }
   })
@@ -140,8 +59,8 @@ function buildSalesPath(data: typeof salesData) {
   return { points, linePath, areaPath }
 }
 
-function SalesOverviewCard() {
-  const { points, linePath, areaPath } = useMemo(() => buildSalesPath(salesData), [])
+function SalesOverviewCard({ data }: { data: Array<{ label: string; value: number }> }) {
+  const { points, linePath, areaPath } = useMemo(() => buildSalesPath(data), [data])
 
   return (
     <div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-[0_12px_30px_rgba(17,46,31,0.04)]">
@@ -173,10 +92,10 @@ function SalesOverviewCard() {
           <path d={linePath} fill="none" stroke="#2f7a4f" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
           {points.map((point, index) => (
-            <g key={salesData[index].label}>
+            <g key={`${data[index]?.label ?? 'empty'}-${index}`}>
               <circle cx={point.x} cy={point.y} r="4.5" fill="#2f7a4f" stroke="#ffffff" strokeWidth="2" />
               <text x={point.x} y="220" textAnchor="middle" fontSize="11" fill="#6a7d74">
-                {salesData[index].label.split(' ')[1]}
+                {data[index]?.label ?? ''}
               </text>
             </g>
           ))}
@@ -193,35 +112,36 @@ function SalesOverviewCard() {
   )
 }
 
-function DonutChart() {
-  const total = orderStatusData.reduce((sum, item) => sum + item.count, 0)
+function DonutChart({ data, orderTotal }: { data: AdminSummary['statusCounts']; orderTotal: number }) {
+  const colors = ['#2f7a4f', '#f4b942', '#5ec4a6', '#8f69d9', '#7ac0eb', '#ef6f5f']
+  const total = data.reduce((sum, item) => sum + item.count, 0)
   const gradient = useMemo(() => {
     let start = 0
-    const segments = orderStatusData.map((item) => {
+    const segments = total ? data.map((item, index) => {
       const end = start + (item.count / total) * 100
-      const segment = `${item.color} ${start}% ${end}%`
+      const segment = `${colors[index % colors.length]} ${start}% ${end}%`
       start = end
       return segment
-    })
+    }) : ['#e8eee9 0% 100%']
     return `conic-gradient(${segments.join(', ')})`
-  }, [total])
+  }, [data, total])
 
   return (
     <div className="flex items-center gap-5">
       <div className="relative flex h-[210px] w-[210px] items-center justify-center rounded-full" style={{ background: gradient }}>
         <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
-          <span className="text-[32px] font-bold tracking-[-0.06em] text-[#1e2a22]">128</span>
+          <span className="text-[32px] font-bold tracking-[-0.06em] text-[#1e2a22]">{orderTotal}</span>
           <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[#6b7b72]">Total Orders</span>
         </div>
       </div>
 
       <div className="flex-1 space-y-2.5">
-        {orderStatusData.map((item) => {
-          const percentage = Math.round((item.count / total) * 100)
+        {data.map((item, index) => {
+          const percentage = total ? Math.round((item.count / total) * 100) : 0
           return (
             <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
                 <span className="text-[#42534d]">{item.label}</span>
               </div>
               <div className="flex items-center gap-2 text-[#566a63]">
@@ -238,9 +158,27 @@ function DonutChart() {
 
 function AdminDashboardPage() {
   const navigate = useNavigate()
+  const accessToken = useAppSelector((state) => state.auth.accessToken)
+  const [summary, setSummary] = useState<AdminSummary | null>(null)
+  const [summaryError, setSummaryError] = useState('')
   const [search, setSearch] = useState('')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  useEffect(() => {
+    if (!accessToken) return
+    void getAdminSummary(accessToken).then(setSummary).catch((error: unknown) => {
+      setSummaryError(error instanceof Error ? error.message : 'Dashboard data is unavailable.')
+    })
+  }, [accessToken])
+
+  const liveKpis = summary ? [
+    { title: 'Total Orders', value: String(summary.totalOrders), icon: '🛒' },
+    { title: 'Total Revenue', value: `${summary.revenue.toLocaleString()} RWF`, icon: '💰' },
+    { title: 'Pending Orders', value: String(summary.pendingOrders), icon: '⏳' },
+    { title: 'Markets', value: String(summary.markets), icon: '⌂' },
+    { title: 'Low Stock Products', value: String(summary.lowStockProducts), icon: '⚠️' },
+  ] : []
 
   return (
     <div className="min-h-screen bg-[#eef4ee] text-[#14241d]">
@@ -377,18 +315,16 @@ function AdminDashboardPage() {
               </div>
             </div>
 
+            {summaryError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{summaryError}</p>}
             <section className="mt-6 grid gap-4 xl:grid-cols-6 md:grid-cols-3 sm:grid-cols-2">
-              {kpis.map((item) => (
+              {(summary ? liveKpis : []).map((item) => (
                 <div key={item.title} className="rounded-[22px] border border-[#dfe7e2] bg-white p-4 shadow-[0_12px_25px_rgba(17,46,31,0.04)]">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf6ee] text-lg text-[#2f7a4f]">{item.icon}</span>
                   </div>
                   <h2 className="mt-4 text-sm font-medium text-[#52635d]">{item.title}</h2>
                   <div className="mt-2 text-[28px] font-black tracking-[-0.06em] text-[#1d2d26]">{item.value}</div>
-                  <div className={`mt-2 inline-flex items-center gap-1 text-sm font-semibold ${item.direction === 'up' ? 'text-[#2f7a4f]' : 'text-[#d65c4a]'}`}>
-                    {item.change}
-                  </div>
-                  <p className="mt-1 text-xs text-[#687873]">{item.subtitle}</p>
+                  <p className="mt-1 text-xs text-[#687873]">Live database total</p>
                   <button
                     type="button"
                     onClick={() => navigate('/admin/orders')}
@@ -401,7 +337,7 @@ function AdminDashboardPage() {
             </section>
 
             <section className="mt-7 grid gap-5 xl:grid-cols-[2.1fr_1fr]">
-              <SalesOverviewCard />
+              <SalesOverviewCard data={summary?.dailySales ?? []} />
 
               <div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-[0_12px_30px_rgba(17,46,31,0.04)]">
                 <div className="flex items-center justify-between gap-3">
@@ -415,7 +351,7 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-6">
-                  <DonutChart />
+                  <DonutChart data={summary?.statusCounts ?? []} orderTotal={summary?.totalOrders ?? 0} />
                 </div>
               </div>
             </section>
@@ -443,7 +379,7 @@ function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentOrders.map((order) => (
+                      {(summary?.recentOrders ?? []).map((order) => (
                         <tr
                           key={order.orderId}
                           className="cursor-pointer border-t border-[#edf2ef] transition hover:bg-[#f9fbfa]"
@@ -453,7 +389,7 @@ function AdminDashboardPage() {
                           <td className="px-5 py-3 text-[#475b55]">{order.customer}</td>
                           <td className="px-5 py-3 text-[#475b55]">{order.items}</td>
                           <td className="px-5 py-3">
-                            <StatusPill status={order.status as RowStatus} />
+                            <span className="rounded-full bg-[#edf6ee] px-2.5 py-1 text-[11px] font-semibold text-[#2f7a4f]">{order.status}</span>
                           </td>
                           <td className="px-5 py-3 font-semibold text-[#1e2a22]">{order.total}</td>
                           <td className="px-5 py-3 text-[#475b55]">{order.time}</td>
@@ -476,15 +412,15 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {lowStockProducts.map((product) => (
+                  {(summary?.lowStock ?? []).map((product) => (
                     <div key={product.name} className="flex items-center gap-3 rounded-[16px] border border-[#edf2ef] bg-[#fbfdfb] p-2.5">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf6ee] text-lg">{product.image}</div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf6ee] text-lg">⚠️</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold text-[#1e2a22]">{product.name}</div>
                         <div className="mt-1 text-xs text-[#5d716a]">Current stock</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-[#1e2a22]">{product.stock}</div>
+                        <div className="text-sm font-semibold text-[#1e2a22]">{product.stock} units</div>
                         <span className="mt-1 inline-flex rounded-full bg-[#fff1ee] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#df5f4c]">
                           Low Stock
                         </span>
@@ -504,14 +440,13 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {topSellingProducts.map((product) => (
+                  {(summary?.topProducts ?? []).map((product) => (
                     <div key={product.name} className="flex items-center gap-3 rounded-[16px] border border-[#edf2ef] bg-[#fbfdfb] p-2.5">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf6ee] text-lg">{product.image}</div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf6ee] text-lg">??</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold text-[#1e2a22]">{product.name}</div>
-                        <div className="mt-1 text-xs text-[#5d716a]">{product.sold}</div>
+                        <div className="mt-1 text-xs text-[#5d716a]">{product.sold} units sold</div>
                       </div>
-                      <div className="text-sm font-bold text-[#2f7a4f]">{product.change}</div>
                     </div>
                   ))}
                 </div>
