@@ -1,14 +1,16 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppSelector } from '../../store/hooks'
 import logo from '../../assets/logo.png'
+import ProfileLink from '../ProfileLink'
 
-const navItems = ['Shop Fresh Food', 'Smart Basket', 'Markets', 'Supermarkets', 'How it Works']
+const navItems = ['Shop Fresh Food', 'Smart Basket', 'Checkout', 'Markets', 'Supermarkets', 'How it Works']
 
 const routeMap: Record<string, string> = {
   'Shop Fresh Food': '/products',
   'Smart Basket': '/basket',
   'Markets': '/markets',
   'Supermarkets': '/supermarkets',
+  Checkout: '/checkout',
   'How it Works': '/how-it-works',
 }
 
@@ -19,16 +21,15 @@ export default function Header() {
 
   return (
     <header className="border-b border-[#e7e1d9] bg-[#f8f4ef]">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-4 py-4 lg:px-6">
-        {/* Logo */}
+      <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-6 py-4 lg:px-8">
         <button
           onClick={() => navigate('/')}
-          className="flex h-12 w-40 items-center justify-center rounded-full bg-white px-4 shadow-sm ring-1 ring-[#e2e8df] hover:shadow-md transition cursor-pointer"
+          aria-label="Tomiland Foods home"
+          className="flex shrink-0 items-center justify-center bg-transparent p-0 transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2f7a4f]"
         >
-          <img src={logo} alt="Tomiland Foods" className="h-10 w-10 rounded-full object-cover" />
+          <img src={logo} alt="Tomiland Foods" className="h-15 w-[120px] -translate-x-[22px] object-contain object-left sm:h-24 sm:w-36 sm:-translate-x-[27px]" />
         </button>
 
-        {/* Navigation */}
         <nav className="hidden items-center gap-8 text-sm font-medium text-[#23372f] lg:flex">
           {navItems.map((item) => {
             const route = routeMap[item] ?? '/products'
@@ -48,14 +49,13 @@ export default function Header() {
           })}
         </nav>
 
-        {/* Right Section - Location & Cart */}
         <div className="flex items-center gap-3">
-          <button className="rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-xs sm:text-sm font-medium text-[#1f3a2b] shadow-sm hover:bg-[#f5faf6] cursor-pointer">
+          <button className="rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-xs font-medium text-[#1f3a2b] shadow-sm hover:bg-[#f5faf6] sm:text-sm">
             Kigali, Rwanda
           </button>
           <button
             onClick={() => navigate('/basket')}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm hover:bg-[#f5faf6] hover:shadow-md transition cursor-pointer relative"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm transition hover:bg-[#f5faf6] hover:shadow-md"
           >
             🛒
             {cartItems.length > 0 && (
@@ -64,6 +64,7 @@ export default function Header() {
               </span>
             )}
           </button>
+          <ProfileLink />
         </div>
       </div>
     </header>

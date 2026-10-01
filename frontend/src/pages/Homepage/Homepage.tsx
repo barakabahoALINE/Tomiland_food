@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import logo from '../../assets/logo.png'
+import { useNavigate } from 'react-router-dom'
 import heroImage from '../../assets/Heroimage.png'
 import { getHomepageData, type HomepageData } from './mockApi'
+import Header from '../../components/Header/Header'
 
 const navPills = ['Fresh & Local', 'Great Prices', 'Fast Delivery']
 
 export default function Homepage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [data, setData] = useState<HomepageData | null>(null)
 
   useEffect(() => {
@@ -32,51 +31,7 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#1e2a22]">
-      <header className="border-b border-[#e7e1d9] bg-[#f8f4ef]">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-[56px] w-[220px] items-center justify-center rounded-full bg-white px-4 shadow-sm ring-1 ring-[#e2e8df]">
-              <img src={logo} alt="Tomiland Foods logo" className="h-30 w-30 rounded-full object-cover" />
-            </div>
-          </div>
-
-          <nav className="hidden items-center gap-10 text-sm font-medium text-[#23372f] lg:flex">
-            {data.navItems.map((item) => {
-              const routeMap: Record<string, string> = {
-                'Shop Fresh Food': '/products',
-                'Smart Basket': '/basket',
-                Markets: '/markets',
-                Supermarkets: '/supermarkets',
-                'How it Works': '/how-it-works',
-              }
-
-              const isActive = location.pathname === (routeMap[item] ?? '/products')
-
-              return (
-                <button
-                  key={item}
-                  onClick={() => navigate(routeMap[item] ?? '/products')}
-                  className={`transition bg-transparent border-none cursor-pointer ${isActive ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}
-                >
-                  {item}
-                </button>
-              )
-            })}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button className="rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-sm font-medium text-[#1f3a2b] shadow-sm hover:bg-[#f5faf6]">
-              Kigali, Rwanda
-            </button>
-            <button
-              onClick={() => navigate('/basket')}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm hover:bg-[#f5faf6] cursor-pointer"
-            >
-              🛒
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="mx-auto max-w-[1280px] px-6 pb-16 pt-8 lg:px-8">
         <section className="rounded-[32px] bg-[#f7f4ef] px-4 pb-4 pt-5 lg:px-8 lg:pb-8">

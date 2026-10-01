@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import logo from '../../assets/logo.png'
-import { useAppDispatch, useAppSelector } from '../../store/hooks'
+import { useNavigate } from 'react-router-dom'
+import { useAppDispatch } from '../../store/hooks'
 import { addItem } from '../../store/slices/cart/cartSlice'
+import Header from '../../components/Header/Header'
 
 type BasketType = 'weekly' | 'recipe' | 'budget' | 'reorder'
 type Category = 'Fresh Produce' | 'Dry Goods' | 'Cooking Essentials' | 'Dairy & Eggs' | 'Meat & Fish' | 'Beverages'
@@ -65,9 +65,7 @@ function BasketModeControls({ basketType, selectedRecipe, budget, activeRecipe, 
 
 export default function BasketPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const dispatch = useAppDispatch()
-  const cartCount = useAppSelector((state) => state.cart.totalItems)
   const [basketType, setBasketType] = useState<BasketType>('weekly')
   const [selectedRecipe, setSelectedRecipe] = useState(recipes[0].id)
   const [budget, setBudget] = useState(15000)
@@ -130,11 +128,7 @@ export default function BasketPage() {
   const addToCart = () => { basketProducts.forEach((product) => dispatch(addItem({ id: `smart-${product.id}`, name: product.name, price: product.price, quantity: quantities[product.id] ?? 1, notes: `${basketType} basket${activeRecipe ? ` - ${activeRecipe.name}` : ''}` }))); notify('Basket added to your cart') }
 
   return <div className="min-h-screen bg-[#f5f1ea] text-[#1e2a22]">
-    <header className="border-b border-[#e7e1d9] bg-[#f8f4ef]"><div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-6 py-4 lg:px-8">
-      <Link to="/" className="flex h-[56px] w-[220px] items-center justify-center rounded-full bg-white px-4 shadow-sm ring-1 ring-[#e2e8df]"><img src={logo} alt="Tomiland Foods logo" className="h-30 w-30 rounded-full object-cover" /></Link>
-      <nav className="hidden items-center gap-10 text-sm font-medium text-[#23372f] lg:flex">{[['Shop Fresh Food', '/products'], ['Smart Basket', '/basket'], ['Markets', '/markets'], ['Supermarkets', '/supermarkets'], ['How it Works', '/how-it-works']].map(([label, path]) => <Link key={path} to={path} className={`transition ${location.pathname === path ? 'font-semibold text-[#2f7a4f] underline decoration-2 underline-offset-[22px]' : 'hover:text-[#2f7a4f]'}`}>{label}</Link>)}</nav>
-      <div className="flex items-center gap-3"><button className="hidden rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-sm font-medium text-[#1f3a2b] shadow-sm sm:block">Kigali, Rwanda</button><Link to="/basket" aria-label="Open cart" className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm">🛒{cartCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#18794e] px-1 text-[10px] font-bold text-white">{cartCount}</span>}</Link></div>
-    </div></header>
+    <Header />
     <main className="mx-auto max-w-[1280px] px-6 pb-20 pt-7 lg:px-8"><div className="grid gap-5 lg:grid-cols-[155px_minmax(0,1fr)_235px] xl:gap-7">
       <aside className="hidden lg:block"><div className="sticky top-5 space-y-4"><div className="rounded-[20px] border border-[#dfe7e2] bg-white p-4 shadow-sm"><h2 className="text-sm font-black">All Categories</h2><div className="mt-3 space-y-1">{sidebarCategories.map((item) => <button key={item.name} disabled={!item.selectable} onClick={() => item.selectable && setCategory(item.selectable)} className={`flex w-full items-center gap-2 rounded-xl p-2 text-left transition ${item.selectable && category === item.selectable ? 'bg-[#edf6ee] text-[#2f7a4f] ring-1 ring-[#c9dfce]' : 'text-[#52645a] hover:bg-[#f5faf6] hover:text-[#2f7a4f]'} ${!item.selectable ? 'cursor-not-allowed opacity-60' : ''}`}><img src={item.image} alt="" className="h-7 w-7 shrink-0 rounded-lg object-cover" /><span className="text-[10px] font-semibold leading-4">{item.name}</span>{item.selectable && category === item.selectable && <span className="ml-auto text-xs font-black">✓</span>}</button>)}</div></div><div className="rounded-[20px] border border-[#dfe7e2] bg-[#eaf3eb] p-4"><p className="text-[10px] font-black uppercase tracking-wider text-[#2f7a4f]">Need help ordering?</p><p className="mt-2 text-xs text-[#52645a]">Call us toll free</p><strong className="text-sm text-[#1f3a2b]">0800 1234</strong><p className="mt-1 text-[10px] text-[#687671]">Everyday: 7AM – 8PM</p></div><div className="rounded-[20px] border border-[#dfe7e2] bg-white p-4"><p className="text-[10px] font-black uppercase tracking-wider text-[#2f7a4f]">Fresh from trusted markets</p><p className="mt-2 text-xs leading-5 text-[#52645a]">Quality you can trust, delivered to you.</p><button className="mt-3 text-xs font-bold text-[#2f7a4f]">Learn more →</button></div></div></aside>
 

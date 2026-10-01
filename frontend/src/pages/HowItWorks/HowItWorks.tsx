@@ -1,58 +1,70 @@
-import { Link, useLocation } from 'react-router-dom'
-import logo from '../../assets/logo.png'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAppDispatch, useAppSelector } from '../../store/hooks'
+import { addItem } from '../../store/slices/cart/cartSlice'
+import Header from '../../components/Header/Header'
+
+const categories = ['Fresh Produce', 'Meat & Fish', 'Dairy & Eggs', 'Grains & Cereals', 'Cooking Essentials', 'Bread & Bakery', 'Drinks', 'Personal Care', 'Household']
+const categoryIcons = ['🥬', '🥩', '🥚', '🌾', '🫙', '🍞', '🥤', '🧴', '🏠']
+const journey = [
+  ['01', 'Choose', 'Start with fresh food, Smart Basket, markets or supermarkets.'],
+  ['02', 'Browse', 'Explore categories, vendors, prices and availability.'],
+  ['03', 'Add to Cart', 'Choose a quantity and add exactly what you need.'],
+  ['04', 'Review Basket', 'Adjust items, compare vendors and check your total.'],
+  ['05', 'Checkout', 'Confirm details, payment and delivery or pickup.'],
+  ['06', 'Receive', 'Track preparation, delivery or pickup from one place.'],
+]
+const marketOptions = [
+  ['Kimironko Market', '1,200 RWF/kg', 'Available', true],
+  ['Nyabugogo Market', '1,300 RWF/kg', 'Available', true],
+  ['Simba Supermarket', 'Currently unavailable', 'Unavailable at this market', false],
+] as const
+const money = (value: number) => `${value.toLocaleString()} RWF`
 
 export default function HowItWorksPage() {
-  const location = useLocation()
+  const dispatch = useAppDispatch()
+  const cartCount = useAppSelector((state) => state.cart.totalItems)
+  const [quantity, setQuantity] = useState(1)
+
+  const addTomatoes = () => {
+    dispatch(addItem({ id: 'how-it-works-tomatoes', name: 'Tomatoes', price: 1200, quantity, notes: 'How it works demo' }))
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#1e2a22]">
-      <header className="border-b border-[#e7e1d9] bg-[#f8f4ef]">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex h-[56px] w-[220px] items-center justify-center rounded-full bg-white px-4 shadow-sm ring-1 ring-[#e2e8df]">
-              <img src={logo} alt="Tomiland Foods logo" className="h-30 w-30 rounded-full object-cover" />
-            </Link>
-          </div>
-
-          <nav className="hidden items-center gap-10 text-sm font-medium text-[#23372f] lg:flex">
-            <Link to="/products" className={`transition ${location.pathname === '/products' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Shop Fresh Food</Link>
-            <Link to="/basket" className={`transition ${location.pathname === '/basket' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Smart Basket</Link>
-            <Link to="/checkout" className={`transition ${location.pathname === '/checkout' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Checkout</Link>
-            <Link to="/markets" className={`transition ${location.pathname === '/markets' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Markets</Link>
-            <Link to="/supermarkets" className={`transition ${location.pathname === '/supermarkets' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Supermarkets</Link>
-            <Link to="/how-it-works" className={`transition ${location.pathname === '/how-it-works' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>How it Works</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button className="rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-sm font-medium text-[#1f3a2b] shadow-sm hover:bg-[#f5faf6]">
-              Kigali, Rwanda
-            </button>
-            <Link to="/basket" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm hover:bg-[#f5faf6]">
-              🛒
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1200px] px-6 py-10 lg:px-8">
-        <div className="rounded-[30px] border border-[#e5e9e4] bg-white p-8 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2f7a4f]">How it works</p>
-          <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] text-[#1e2a22]">How Tomiland works</h1>
-          <div className="mt-6 grid gap-5 md:grid-cols-3">
-            <div className="rounded-[24px] bg-[#f9faf8] p-5">
-              <h2 className="text-lg font-bold text-[#1d2f27]">1. Choose</h2>
-              <p className="mt-2 text-sm leading-6 text-[#4d5d53]">Pick fresh groceries from nearby markets and supermarkets.</p>
+      <Header />
+      <main className="mx-auto max-w-[1280px] px-6 pb-20 pt-7 lg:px-8">
+        <section className="rounded-[28px] bg-[#eaf3eb] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
+          <div className="grid items-center gap-8 lg:grid-cols-[1fr_0.9fr]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#2f7a4f]">How Tomiland Foods works</p>
+              <h1 className="mt-3 max-w-[620px] text-4xl font-black leading-[0.98] tracking-[-0.06em] sm:text-5xl lg:text-[4.3rem]">From choosing your groceries to your doorstep.</h1>
+              <p className="mt-5 max-w-[570px] text-base leading-7 text-[#4d5d53]">Shop fresh food, build your Smart Basket, compare local markets and supermarkets, add what you need to your cart, and choose how you want to receive your order.</p>
+              <div className="mt-7 flex flex-wrap gap-3"><Link to="/products" className="rounded-full bg-[#2f7a4f] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_22px_rgba(47,122,79,0.25)]">Start Shopping →</Link><Link to="/basket" className="rounded-full border border-[#cfe0d4] bg-white px-5 py-3 text-sm font-bold text-[#2f7a4f]">Build Smart Basket</Link></div>
             </div>
-            <div className="rounded-[24px] bg-[#f9faf8] p-5">
-              <h2 className="text-lg font-bold text-[#1d2f27]">2. Basket</h2>
-              <p className="mt-2 text-sm leading-6 text-[#4d5d53]">Bundle your essentials and review your order before checkout.</p>
-            </div>
-            <div className="rounded-[24px] bg-[#f9faf8] p-5">
-              <h2 className="text-lg font-bold text-[#1d2f27]">3. Delivered</h2>
-              <p className="mt-2 text-sm leading-6 text-[#4d5d53]">Get your groceries delivered quickly and conveniently to your door.</p>
-            </div>
+            <div className="rounded-[24px] border border-[#d5e5d8] bg-white p-4 shadow-[0_18px_35px_rgba(21,54,34,0.1)]"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#2f7a4f]">Your basket follows you</p><div className="mt-5 grid grid-cols-5 items-center gap-1 text-center text-[10px] font-bold text-[#52645a]">{['🥬 Product', '＋ Cart', '🛒 Basket', '✓ Checkout', '⌂ Receive'].map((item, index) => <div key={item} className="contents"><div className="rounded-2xl bg-[#edf6ee] px-2 py-4 text-[#1f3a2b]">{item}</div>{index < 4 && <span className="text-lg text-[#2f7a4f]">→</span>}</div>)}</div><div className="mt-5 rounded-2xl bg-[#f7faf7] p-4"><div className="flex items-center justify-between"><span className="text-sm font-bold">Fresh order in progress</span><span className="rounded-full bg-[#dceedd] px-2 py-1 text-[10px] font-bold text-[#2f7a4f]">Live</span></div><div className="mt-4 h-2 rounded-full bg-[#dfe9e1]"><div className="h-2 w-3/4 rounded-full bg-[#2f7a4f]" /></div><p className="mt-2 text-xs text-[#687671]">Choose → Add → Review → Receive</p></div></div>
           </div>
-        </div>
+        </section>
+
+        <section className="mt-10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">The complete journey</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Simple from first click to final delivery.</h2><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{journey.map(([number, title, copy]) => <div key={number} className="rounded-[18px] border border-[#dfe7e2] bg-white p-4 shadow-sm"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2f7a4f] text-sm font-black text-white">{number}</span><h3 className="mt-4 text-sm font-black">{title}</h3><p className="mt-1 text-xs leading-5 text-[#687671]">{copy}</p></div>)}</div></section>
+
+        <section className="mt-12"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">Choose what you need</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Browse by category.</h2></div><Link to="/products" className="text-sm font-bold text-[#2f7a4f]">Explore products →</Link></div><p className="mt-2 text-sm text-[#607068]">Find fresh food and everyday essentials from different participating vendors.</p><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{categories.map((category, index) => <Link key={category} to="/products" className="rounded-[18px] border border-[#dfe7e2] bg-[#f9faf8] p-4 transition hover:-translate-y-1 hover:shadow-md"><div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e5f1e6] text-xl">{categoryIcons[index]}</div><h3 className="mt-3 text-sm font-bold">{category}</h3><p className="mt-1 text-[11px] text-[#687671]">Browse options →</p></Link>)}</div></section>
+
+        <section className="mt-12 rounded-[26px] border border-[#dfe7e2] bg-white p-5 shadow-sm sm:p-7"><div className="max-w-[620px]"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">The important part</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Found what you need? Add it to your cart.</h2><p className="mt-2 text-sm leading-6 text-[#607068]">Choose your quantity and add products from markets and supermarkets to your basket. This is where your shopping list becomes an order.</p></div><div className="mt-6 grid items-center gap-4 lg:grid-cols-[1fr_auto_1fr]"><div className="rounded-[20px] border border-[#dfe7e2] bg-[#f8fbf8] p-5"><div className="flex items-start justify-between"><div><span className="rounded-full bg-[#dceedd] px-2 py-1 text-[10px] font-bold text-[#2f7a4f]">Fresh • Local</span><h3 className="mt-3 text-xl font-black">Tomatoes</h3><p className="mt-1 text-sm text-[#687671]">Kimironko Market · Available</p></div><span className="text-4xl">🍅</span></div><p className="mt-5 text-xl font-black">{money(1200)} <span className="text-xs font-medium text-[#687671]">/ kg</span></p><div className="mt-4 flex items-center justify-between gap-3"><span className="text-xs font-bold text-[#52645a]">Quantity</span><div className="flex items-center gap-2"><button aria-label="Decrease tomato quantity" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfe7e2] bg-white font-bold">−</button><span className="w-5 text-center text-sm font-bold">{quantity}</span><button aria-label="Increase tomato quantity" onClick={() => setQuantity(quantity + 1)} className="flex h-8 w-8 items-center justify-center rounded-full border border-[#dfe7e2] bg-white font-bold">+</button></div></div><button onClick={addTomatoes} className="mt-5 w-full rounded-full bg-[#2f7a4f] px-4 py-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(47,122,79,0.25)]">＋ Add to Cart</button></div><div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#edf6ee] text-xl font-black text-[#2f7a4f]">→</div><div className="rounded-[20px] border border-[#cfe0d4] bg-[#edf6ee] p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.13em] text-[#2f7a4f]">Your Cart</p><h3 className="mt-1 text-xl font-black">{cartCount ? `Cart (${cartCount})` : 'Cart (0)'}</h3></div><span className="text-3xl">🛒</span></div><div className="mt-5 flex items-center justify-between border-b border-[#d4e4d7] pb-4 text-sm"><div><p className="font-bold">Tomatoes</p><p className="text-xs text-[#687671]">{quantity} kg</p></div><span className="font-bold">{money(1200 * quantity)}</span></div><div className="mt-4 flex items-center justify-between text-sm font-black"><span>Subtotal</span><span className="text-[#2f7a4f]">{money(1200 * quantity)}</span></div><Link to="/basket" className="mt-5 block w-full rounded-full border border-[#2f7a4f] bg-white px-4 py-3 text-center text-sm font-bold text-[#2f7a4f]">View Cart →</Link><p className="mt-3 text-center text-[11px] text-[#52645a]">{cartCount ? 'Added to your live basket.' : 'Add a product to see the basket update.'}</p></div></div></section>
+
+        <section className="mt-12 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]"><div className="rounded-[24px] border border-[#dfe7e2] bg-[#eaf3eb] p-6"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">Shop smarter</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Build a Smart Basket around your life.</h2><p className="mt-3 text-sm leading-6 text-[#52645a]">Choose categories, tell us your household size and budget, then adjust the practical suggestions we find across participating markets and supermarkets.</p><div className="mt-5 grid gap-2 sm:grid-cols-3">{['Choose categories', 'Household + budget', 'Suggested basket'].map((item, index) => <div key={item} className="rounded-xl border border-[#d5e5d8] bg-white p-3"><span className="text-xs font-black text-[#2f7a4f]">0{index + 1}</span><p className="mt-2 text-xs font-bold">{item}</p></div>)}</div><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[#52645a]"><span>↓ Adjust items</span><span>↓ Add or remove</span><span>↓ Continue to checkout</span></div><Link to="/basket" className="mt-6 inline-flex rounded-full bg-[#2f7a4f] px-5 py-3 text-sm font-bold text-white">Build My Smart Basket →</Link></div><div className="rounded-[24px] border border-[#dfe7e2] bg-white p-6 shadow-sm"><div className="flex items-center justify-between"><h3 className="text-lg font-black">Suggested Basket</h3><span className="text-xs font-bold text-[#2f7a4f]">RWF 8,900</span></div><div className="mt-4 space-y-2">{[['Tomatoes', '1 kg', '1,200 RWF'], ['Rice', '2 kg', '4,500 RWF'], ['Milk', '1 litre', '1,200 RWF']].map(([name, unit, price]) => <div key={name} className="flex items-center justify-between rounded-xl bg-[#f8fbf8] p-3 text-xs"><span><b>{name}</b><small className="ml-2 text-[#687671]">{unit}</small></span><span className="font-bold">{price}</span></div>)}</div><div className="mt-5 rounded-xl bg-[#fff8eb] p-3 text-xs text-[#8c571e]"><b>Built for your budget</b><p className="mt-1">Compare available options, then make the basket yours.</p></div></div></section>
+
+        <section className="mt-12"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">Where to shop</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Markets and supermarkets, together.</h2></div><div className="flex gap-2"><Link to="/markets" className="rounded-full border border-[#dfe7e2] bg-white px-4 py-2 text-xs font-bold text-[#2f7a4f]">Explore Markets</Link><Link to="/supermarkets" className="rounded-full border border-[#dfe7e2] bg-white px-4 py-2 text-xs font-bold text-[#2f7a4f]">Explore Supermarkets</Link></div></div><div className="mt-5 grid gap-4 md:grid-cols-2"><div className="rounded-[22px] border border-[#dfe7e2] bg-white p-5 shadow-sm"><span className="text-3xl">🥬</span><h3 className="mt-3 text-xl font-black">Local Markets</h3><p className="mt-2 text-sm leading-6 text-[#687671]">Fresh products from trusted local vendors, with location, rating, opening status and basket availability.</p></div><div className="rounded-[22px] border border-[#dfe7e2] bg-white p-5 shadow-sm"><span className="text-3xl">🛍️</span><h3 className="mt-3 text-xl font-black">Supermarkets</h3><p className="mt-2 text-sm leading-6 text-[#687671]">A wider selection of packaged groceries and everyday essentials, with delivery or pickup where offered.</p></div></div></section>
+
+        <section className="mt-12 rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-sm sm:p-6"><div className="max-w-[680px]"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">Availability made clear</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">See every option, even when it is unavailable.</h2><p className="mt-2 text-sm leading-6 text-[#607068]">A product or shopping method may not be available at your selected location. We show that clearly, so you can compare another participating market or supermarket instead.</p></div><div className="mt-5 space-y-2">{marketOptions.map(([name, price, status, available]) => <div key={name} className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${available ? 'border-[#cfe0d4] bg-[#f5faf6]' : 'border-[#ead7b8] bg-[#fff8eb]'}`}><div className="flex items-center gap-3"><span className={`text-lg ${available ? 'text-[#2f7a4f]' : 'text-[#b76a21]'}`}>{available ? '✓' : '○'}</span><div><b className="text-sm">{name}</b><p className="text-xs text-[#687671]">{available ? price : 'This option may be available from another market or supermarket.'}</p></div></div><span className={`text-xs font-bold ${available ? 'text-[#2f7a4f]' : 'text-[#b76a21]'}`}>{status}</span></div>)}</div></section>
+
+        <section className="mt-12 grid gap-5 lg:grid-cols-2"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">Choose how to receive it</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Delivery or pickup, depending on the location.</h2><p className="mt-2 text-sm leading-6 text-[#607068]">Available options depend on the selected vendor and location.</p><div className="mt-5 space-y-2">{[['🚚', 'Delivery', 'Delivered to your doorstep.'], ['📍', 'Pickup Now', 'Collect your order when ready.'], ['🕐', 'Pickup Later', 'Choose a convenient pickup time when available.']].map(([icon, title, copy]) => <div key={title} className="flex items-center gap-4 rounded-[18px] border border-[#dfe7e2] bg-white p-4"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#edf6ee] text-xl">{icon}</span><div><h3 className="text-sm font-bold">{title}</h3><p className="mt-1 text-xs text-[#687671]">{copy}</p></div><span className="ml-auto text-[#2f7a4f]">→</span></div>)}</div></div><div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#2f7a4f]">Checkout preview</p><h3 className="mt-2 text-xl font-black">Your Basket</h3><div className="mt-4 space-y-3 text-sm">{[['Tomatoes', '1,200 RWF'], ['Rice', '4,500 RWF'], ['Milk', '1,200 RWF']].map(([name, price]) => <div key={name} className="flex justify-between"><span>{name}</span><b>{price}</b></div>)}<div className="flex justify-between border-t border-[#edf2ee] pt-3"><span>Subtotal</span><b>6,900 RWF</b></div><div className="flex justify-between"><span>Delivery</span><b>2,000 RWF</b></div><div className="flex justify-between border-t border-[#edf2ee] pt-3 text-lg font-black"><span>Total</span><span className="text-[#2f7a4f]">8,900 RWF</span></div></div><div className="mt-5 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-[#dfe7e2] p-3 text-xs"><span className="text-[#687671]">Delivery</span><b className="mt-1 block">Kigali address</b></div><div className="rounded-xl border border-[#dfe7e2] p-3 text-xs"><span className="text-[#687671]">Payment</span><b className="mt-1 block">Choose method</b></div></div><Link to="/checkout" className="mt-5 block rounded-full bg-[#2f7a4f] px-4 py-3 text-center text-sm font-bold text-white">Confirm Order →</Link></div></section>
+
+        <section className="mt-12 rounded-[24px] border border-[#dfe7e2] bg-[#eaf3eb] p-6 sm:p-8"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2f7a4f]">After checkout</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Know where your order is.</h2><p className="mt-2 text-sm text-[#607068]">We keep you updated from confirmation to delivery or pickup.</p></div><Link to="/checkout" className="rounded-full bg-[#2f7a4f] px-5 py-3 text-sm font-bold text-white">Review Checkout →</Link></div><div className="mt-8 grid gap-3 sm:grid-cols-5">{['Order confirmed', 'Vendor preparing', 'Ready / picked up', 'Out for delivery', 'Delivered'].map((status, index) => <div key={status} className="relative rounded-xl border border-[#d5e5d8] bg-white p-3 text-center"><span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-black ${index < 3 ? 'bg-[#2f7a4f] text-white' : 'border-2 border-[#8eb79a] text-[#2f7a4f]'}`}>{index < 3 ? '✓' : index + 1}</span><p className="mt-3 text-xs font-bold">{status}</p>{index === 2 && <p className="mt-1 text-[10px] text-[#687671]">Pickup orders stop here.</p>}</div>)}</div></section>
+
+        <section className="mt-12"><h2 className="text-center text-3xl font-black tracking-[-0.05em]">Why shop with Tomiland?</h2><div className="mt-5 grid gap-3 md:grid-cols-3">{[['✦', 'Fresh & Quality', 'Carefully selected products from trusted vendors.'], ['₣', 'Great Prices', 'Compare available products and options.'], ['⌂', 'Reliable Delivery', 'Get groceries delivered or choose pickup where available.']].map(([icon, title, copy]) => <div key={title} className="rounded-[20px] border border-[#dfe7e2] bg-white p-5 text-center shadow-sm"><span className="text-2xl text-[#2f7a4f]">{icon}</span><h3 className="mt-3 text-sm font-black">{title}</h3><p className="mt-2 text-xs leading-5 text-[#687671]">{copy}</p></div>)}</div></section>
+
+        <section className="mt-12 rounded-[26px] bg-[#1f3a2b] px-6 py-9 text-center text-white sm:px-10"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b9d9be]">Ready to shop smarter?</p><h2 className="mt-2 text-3xl font-black tracking-[-0.05em]">Build your basket your way.</h2><p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#d5e5d8]">Find fresh food, trusted markets and supermarkets, and choose how you want to receive your order.</p><div className="mt-6 flex flex-wrap justify-center gap-3"><Link to="/products" className="rounded-full bg-white px-5 py-3 text-sm font-bold text-[#1f3a2b]">Start Shopping →</Link><Link to="/basket" className="rounded-full border border-[#83aa8e] px-5 py-3 text-sm font-bold text-white">Build Smart Basket →</Link></div></section>
       </main>
     </div>
   )

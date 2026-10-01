@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import logo from '../../assets/logo.png'
+import { useNavigate } from 'react-router-dom'
+import Header from '../../components/Header/Header'
 
 type Market = {
   id: string
@@ -110,7 +110,6 @@ const markets: Market[] = [
 ]
 
 export default function MarketsPage() {
-  const location = useLocation()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [selectedType, setSelectedType] = useState<'All' | 'Local Market'>('All')
@@ -188,32 +187,7 @@ export default function MarketsPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#1e2a22]">
-      <header className="border-b border-[#e7e1d9] bg-[#f8f4ef]">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-5 px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex h-[56px] w-[220px] items-center justify-center rounded-full bg-white px-4 shadow-sm ring-1 ring-[#e2e8df]">
-              <img src={logo} alt="Tomiland Foods logo" className="h-30 w-30 rounded-full object-cover" />
-            </Link>
-          </div>
-
-          <nav className="hidden items-center gap-10 text-sm font-medium text-[#23372f] lg:flex">
-            <Link to="/products" className={`transition ${location.pathname === '/products' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Shop Fresh Food</Link>
-            <Link to="/basket" className={`transition ${location.pathname === '/basket' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Smart Basket</Link>
-            <Link to="/markets" className={`transition ${location.pathname === '/markets' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Markets</Link>
-            <Link to="/supermarkets" className={`transition ${location.pathname === '/supermarkets' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>Supermarkets</Link>
-            <Link to="/how-it-works" className={`transition ${location.pathname === '/how-it-works' ? 'text-[#2f7a4f] font-semibold' : 'hover:text-[#2f7a4f]'}`}>How it Works</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button className="rounded-full border border-[#dfe9e1] bg-white px-3 py-2 text-sm font-medium text-[#1f3a2b] shadow-sm hover:bg-[#f5faf6]">
-              Kigali, Rwanda
-            </button>
-            <Link to="/basket" className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dfe9e1] bg-white text-xl shadow-sm hover:bg-[#f5faf6]">
-              🛒
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <main className="mx-auto max-w-[1280px] px-6 py-6 lg:px-8">
         <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
