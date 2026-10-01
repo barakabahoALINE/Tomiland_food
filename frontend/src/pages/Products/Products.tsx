@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { addItem } from '../../store/slices/cart/cartSlice'
 import type { ProductsData, Product } from '../../data/mockApi'
@@ -9,45 +9,61 @@ import Header from '../../components/Header/Header'
 type FilterState = {
   category: string
   market: string
+  searchQuery: string
   availability: string
-  priceRange: [number, number]
-  sortBy: 'popular' | 'low-to-high' | 'high-to-low' | 'newest'
+  priceMax: number
+  sortBy: 'popular' | 'low-to-high' | 'high-to-low' | 'rating'
+}
+
+const CATEGORY_NAMES: Record<string, string> = {
+  'all': 'All Fresh Items',
+  'fresh-produce': 'Fresh Produce & Greens',
+  'meat-fish': 'Fresh Meat & Fish',
+  'dairy-eggs': 'Dairy, Milk & Eggs',
+  'grains-cereals': 'Grains, Rice & Cereals',
+  'cooking-essentials': 'Cooking Oils & Spices',
+  'bread-bakery': 'Artisanal Bakery & Breads',
+  'drinks': 'Juices & Fresh Drinks',
 }
 
 export default function ProductsPage() {
   const location = useLocation()
-  const [data, setData] = useState<ProductsData | null>(null)
-  const [filters, setFilters] = useState<FilterState>({
-    category: 'fresh-produce',
-    market: new URLSearchParams(location.search).get('market') ?? '',
-    availability: '',
-    priceRange: [0, 10000],
-    sortBy: 'popular',
-  })
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [selectedPackaging, setSelectedPackaging] = useState<{ [key: string]: string }>({})
-  const [quantity, setQuantity] = useState<{ [key: string]: number }>({})
+  const navigate = useNavigate()
   const dispatch = useAppDispatch()
   const { accessToken } = useAppSelector((state) => state.auth)
   const cartItems = useAppSelector((state) => state.cart.items)
 
+  const [data, setData] = useState<ProductsData | null>(null)
+  const [filters, setFilters] = useState<FilterState>({
+    category: new URLSearchParams(location.search).get('category') ?? 'all',
+    market: new URLSearchParams(location.search).get('market') ?? '',
+    searchQuery: '',
+    availability: '',
+    priceMax: 25000,
+    sortBy: 'popular',
+  })
+
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [selectedPackaging, setSelectedPackaging] = useState<{ [key: string]: string }>({})
+  const [quantity, setQuantity] = useState<{ [key: string]: number }>({})
+  const [addedToast, setAddedToast] = useState<string | null>(null)
+
   useEffect(() => {
     const loadProducts = async () => {
       try {
-      const productsData = await getProducts()
-      setData(productsData)
-      // Initialize packaging and quantity
-      const packagingMap: { [key: string]: string } = {}
-      const quantityMap: { [key: string]: number } = {}
-      productsData.featured.forEach((product) => {
-        if (product.packaging && product.packaging.length > 0) {
-          packagingMap[product.id] = product.packaging[0]
-        }
-        quantityMap[product.id] = 1
-      })
-      setSelectedPackaging(packagingMap)
-      setQuantity(quantityMap)
+        const productsData = await getProducts()
+        setData(productsData)
+        const packagingMap: { [key: string]: string } = {}
+        const quantityMap: { [key: string]: number } = {}
+        productsData.featured.forEach((product) => {
+          if (product.packaging && product.packaging.length > 0) {
+            packagingMap[product.id] = product.packaging[0]
+          }
+          quantityMap[product.id] = 1
+        })
+        setSelectedPackaging(packagingMap)
+        setQuantity(quantityMap)
       } catch {
         setData({ featured: [], categories: [], summary: { totalProducts: 0, availableToday: 'Unavailable' } })
       }
@@ -55,236 +71,231 @@ export default function ProductsPage() {
     void loadProducts()
   }, [])
 
-  if (!data) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f1ea] text-[#1f3a2b]">
-        <div className="rounded-full border border-[#dfeae3] bg-white px-6 py-3 text-sm font-medium shadow-sm">
-          Loading...
-        </div>
-      </div>
-    )
-  }
-
-  // Filter products based on selected filters
-  const filteredProducts = data.featured
-    .filter((product) => {
-      const matchesCategory = product.category === filters.category
-      const matchesMarket = !filters.market || product.market === filters.market
-      const matchesAvailability = !filters.availability ||
-        (filters.availability === 'Available today' && product.availability === 'available') ||
-        (filters.availability === 'Low stock' && product.availability === 'limited') ||
-        (filters.availability === 'Out of stock' && product.availability === 'out_of_stock')
-      const price = Number.parseInt(product.price, 10) || 0
-      const matchesPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1]
-
-      return matchesCategory && matchesMarket && matchesAvailability && matchesPrice
-    })
-    .sort((a, b) => {
-      switch (filters.sortBy) {
-        case 'low-to-high':
-          return Number.parseInt(a.price, 10) - Number.parseInt(b.price, 10)
-        case 'high-to-low':
-          return Number.parseInt(b.price, 10) - Number.parseInt(a.price, 10)
-        case 'newest':
-          return 0
-        default:
-          return 0
-      }
-    })
-
-  const currentCategory = data.categories.find((c) => c.id === filters.category)
-  const subcategories = Array.from(new Set(data.featured.filter((p) => p.category === filters.category).map((p) => p.subcategory)))
+  // Update category if URL query changes
+  useEffect(() => {
+    const cat = new URLSearchParams(location.search).get('category')
+    if (cat) {
+      setFilters((prev) => ({ ...prev, category: cat }))
+    }
+  }, [location.search])
 
   const handleAddToCart = (product: Product, pkg: string, qty: number) => {
     const item = {
       id: product.id,
-      name: `${product.name}${product.kinyarwandaName ? ` / ${product.kinyarwandaName}` : ''} (${pkg})`,
-      price: parseInt(product.price),
+      name: `${product.name}${product.kinyarwandaName ? ` (${product.kinyarwandaName})` : ''} - ${pkg}`,
+      price: parseInt(product.price, 10) || 1000,
       quantity: qty,
       imageUrl: product.image,
       packaging: pkg,
     }
     dispatch(addItem(item))
+
+    // Trigger toast notification
+    setAddedToast(`Added ${qty}x ${product.name} to basket!`)
+    setTimeout(() => setAddedToast(null), 2500)
+
     if (accessToken) {
       const existing = cartItems.find((entry) => entry.id === item.id && entry.packaging === pkg)
       const updated = existing
-        ? cartItems.map((entry) => entry === existing ? { ...entry, quantity: entry.quantity + qty } : entry)
+        ? cartItems.map((entry) => (entry === existing ? { ...entry, quantity: entry.quantity + qty } : entry))
         : [...cartItems, item]
-      void saveCart(updated, accessToken).catch((error: unknown) => console.error('Could not save basket:', error))
+      void saveCart(updated, accessToken).catch((error: unknown) =>
+        console.error('Could not sync basket with backend:', error),
+      )
     }
   }
+
+  // Filter & Sort Products
+  const filteredProducts = useMemo(() => {
+    if (!data) return []
+    return data.featured
+      .filter((product) => {
+        const matchesCategory =
+          filters.category === 'all' || product.category === filters.category
+        const matchesMarket = !filters.market || product.market.toLowerCase().includes(filters.market.toLowerCase())
+        const matchesSearch =
+          !filters.searchQuery ||
+          product.name.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+          (product.kinyarwandaName && product.kinyarwandaName.toLowerCase().includes(filters.searchQuery.toLowerCase()))
+        const matchesAvailability =
+          !filters.availability ||
+          (filters.availability === 'available' && product.availability === 'available') ||
+          (filters.availability === 'limited' && product.availability === 'limited')
+        const price = Number.parseInt(product.price, 10) || 0
+        const matchesPrice = price <= filters.priceMax
+
+        return matchesCategory && matchesMarket && matchesSearch && matchesAvailability && matchesPrice
+      })
+      .sort((a, b) => {
+        const priceA = Number.parseInt(a.price, 10) || 0
+        const priceB = Number.parseInt(b.price, 10) || 0
+        switch (filters.sortBy) {
+          case 'low-to-high':
+            return priceA - priceB
+          case 'high-to-low':
+            return priceB - priceA
+          case 'rating':
+            return (b.rating ?? 0) - (a.rating ?? 0)
+          default:
+            return 0
+        }
+      })
+  }, [data, filters])
+
+  const cartTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
+  const cartItemCount = cartItems.reduce((acc, item) => acc + item.quantity, 0)
+
+  if (!data) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#f5f1ea]">
+        <Header />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-3 border-[#2f7a4f] border-t-transparent" />
+          <p className="font-syne font-bold text-[#2f7a4f]">Loading fresh Kigali market products…</p>
+        </div>
+      </div>
+    )
+  }
+
+  const activeCategoryTitle =
+    CATEGORY_NAMES[filters.category] ??
+    data.categories.find((c) => c.id === filters.category)?.name ??
+    'Fresh Kigali Marketplace'
 
   return (
     <div className="min-h-screen bg-[#f5f1ea] text-[#1e2a22]">
       <Header />
 
+      {/* Floating Toast Notice */}
+      {addedToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-emerald-300 bg-[#1e2a22] px-5 py-3.5 text-sm font-bold text-white shadow-2xl animate-fade-up">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#2f7a4f] text-xs">✓</span>
+          <span>{addedToast}</span>
+        </div>
+      )}
+
+      {/* Product Detail Modal */}
       {showModal && selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setShowModal(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowModal(false)}
+        >
           <div
-            className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-xl overflow-hidden rounded-[28px] border border-[#dfe7e2] bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
-            <button
-              onClick={() => setShowModal(false)}
-              className="sticky top-0 right-0 float-right m-4 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200"
-            >
-              ✕
-            </button>
-
-            <div className="p-6">
-              {/* Product Image */}
-              <div className="mb-6 rounded-[20px] overflow-hidden bg-[#f5faf6] h-64 w-full">
-                <img src={selectedProduct.image} alt={selectedProduct.name} className="h-full w-full object-cover" />
-              </div>
-
-              {/* Product Header */}
-              <div className="mb-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-[#1d2f27]">
-                      {selectedProduct.name}
-                      {selectedProduct.kinyarwandaName && <span className="text-sm font-normal text-[#5a6762]"> / {selectedProduct.kinyarwandaName}</span>}
-                    </h2>
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#2f7a4f]">
-                        {selectedProduct.freshness}
-                      </span>
-                      {selectedProduct.badge === 'FARM FRESH' && <span className="text-xs text-[#2f7a4f]">• Local</span>}
-                    </div>
-                  </div>
-                  <button className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5faf6] hover:bg-[#ebf7ef]">
-                    ♡
-                  </button>
-                </div>
-              </div>
-
-              {/* Rating & Availability */}
-              <div className="mb-6 flex items-center gap-6 pb-6 border-b border-[#dfe7e2]">
-                <div>
-                  <p className="text-xs text-[#5a6762]">Rating</p>
-                  <p className="text-lg font-bold text-[#1e2a22]">★ {selectedProduct.rating.toFixed(1)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#5a6762]">Market</p>
-                  <p className="text-lg font-bold text-[#1e2a22]">{selectedProduct.market}</p>
-                </div>
-                {selectedProduct.availability && (
-                  <div className="flex-1">
-                    <p className="text-xs text-[#5a6762]">Availability</p>
-                    <p className="inline-block mt-1 rounded-full bg-[#ebf7ef] px-3 py-1 text-xs font-medium text-[#2f7a4f]">
-                      {selectedProduct.availability === 'available' && 'Available today'}
-                      {selectedProduct.availability === 'limited' && 'Limited availability'}
-                      {selectedProduct.availability === 'out_of_stock' && 'Out of stock'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Product Details */}
-              {selectedProduct.details && Object.keys(selectedProduct.details).length > 0 && (
-                <div className="mb-6">
-                  <h3 className="mb-4 text-sm font-bold text-[#1e2a22]">Details</h3>
-                  <div className="space-y-2">
-                    {Object.entries(selectedProduct.details).map(([key, value]) => (
-                      <div key={key} className="flex justify-between text-sm text-[#5a6762]">
-                        <span className="font-medium">{key}:</span>
-                        <span>{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 border-t border-[#dfe7e2] pt-4" />
-                </div>
+            <div className="relative h-64 w-full bg-[#edf6ee]">
+              <img src={selectedProduct.image} alt={selectedProduct.name} className="h-full w-full object-cover" />
+              <button
+                onClick={() => setShowModal(false)}
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-sm font-bold shadow-md transition hover:bg-white"
+              >
+                ✕
+              </button>
+              {selectedProduct.badge && (
+                <span className="absolute left-4 top-4 rounded-full bg-[#2f7a4f] px-3 py-1 text-xs font-black text-white shadow-sm">
+                  {selectedProduct.badge}
+                </span>
               )}
+            </div>
 
-              {/* Options/Variants */}
-              {selectedProduct.options && selectedProduct.options.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="mb-4 text-sm font-bold text-[#1e2a22]">Options</h3>
-                  <div className="space-y-4">
-                    {selectedProduct.options.map((option, idx) => (
-                      <div key={idx}>
-                        <label className="mb-2 block text-sm font-medium text-[#1e2a22]">{option.label}</label>
-                        <div className="flex flex-wrap gap-2">
-                          {option.options.map((opt) => (
-                            <button
-                              key={opt}
-                              className="rounded-lg border border-[#dfe7e2] bg-white px-4 py-2 text-sm font-medium text-[#1e2a22] hover:border-[#2f7a4f] hover:bg-[#ebf7ef] hover:text-[#2f7a4f]"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 border-t border-[#dfe7e2]" />
+            <div className="p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-syne text-2xl font-black text-[#16231a]">{selectedProduct.name}</h2>
+                  {selectedProduct.kinyarwandaName && (
+                    <p className="text-sm font-semibold text-[#5a6762]">Kinyarwanda: {selectedProduct.kinyarwandaName}</p>
+                  )}
                 </div>
-              )}
+                <div className="text-right">
+                  <span className="font-syne text-2xl font-black text-[#2f7a4f]">
+                    {parseInt(selectedProduct.price, 10).toLocaleString()} RWF
+                  </span>
+                  <p className="text-xs text-[#5a6762]">{selectedProduct.priceUnit ?? '/ unit'}</p>
+                </div>
+              </div>
 
-              {/* Packaging Selection */}
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="rounded-full bg-[#edf6ee] px-3 py-1 font-bold text-[#2f7a4f]">
+                  📍 {selectedProduct.market}
+                </span>
+                <span className="rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-700">
+                  ★ {selectedProduct.rating?.toFixed(1) ?? '4.8'} (Verified)
+                </span>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-700">
+                  🌿 {selectedProduct.freshness ?? 'Farm Fresh'}
+                </span>
+              </div>
+
+              {/* Packaging selection */}
               {selectedProduct.packaging && selectedProduct.packaging.length > 0 && (
-                <div className="mb-6 pt-4">
-                  <h3 className="mb-4 text-sm font-bold text-[#1e2a22]">Select Packaging</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {selectedProduct.packaging.map((pkg) => (
-                      <button
-                        key={pkg}
-                        onClick={() => setSelectedPackaging({ ...selectedPackaging, [selectedProduct.id]: pkg })}
-                        className={`rounded-lg border px-4 py-3 text-sm font-medium transition ${
-                          selectedPackaging[selectedProduct.id] === pkg
-                            ? 'border-[#2f7a4f] bg-[#ebf7ef] text-[#2f7a4f]'
-                            : 'border-[#dfe7e2] bg-white text-[#1e2a22] hover:border-[#2f7a4f]'
-                        }`}
-                      >
-                        {pkg}
-                      </button>
-                    ))}
+                <div className="mt-6">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#5a6762]">
+                    Select Packaging Size
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedProduct.packaging.map((pkg) => {
+                      const isChosen = (selectedPackaging[selectedProduct.id] || selectedProduct.packaging?.[0]) === pkg
+                      return (
+                        <button
+                          key={pkg}
+                          type="button"
+                          onClick={() => setSelectedPackaging({ ...selectedPackaging, [selectedProduct.id]: pkg })}
+                          className={`rounded-xl border px-3.5 py-2 text-xs font-bold transition ${
+                            isChosen
+                              ? 'border-[#2f7a4f] bg-[#edf6ee] text-[#2f7a4f]'
+                              : 'border-[#dfe7e2] bg-white text-[#1e2a22] hover:border-[#2f7a4f]'
+                          }`}
+                        >
+                          {pkg}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Price Section */}
-              <div className="mb-6 rounded-lg border border-[#dfe7e2] bg-[#f9faf8] p-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm text-[#5a6762]">Price</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-[#1e2a22]">{selectedProduct.price}</span>
-                    {selectedProduct.priceUnit && <span className="text-sm text-[#5a6762]">{selectedProduct.priceUnit}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Quantity & Add to Cart */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 rounded-lg border border-[#dfe7e2] p-4">
-                  <span className="text-sm font-medium text-[#1e2a22]">Quantity:</span>
-                  <div className="flex items-center gap-3 ml-auto">
-                    <button
-                      onClick={() => setQuantity({ ...quantity, [selectedProduct.id]: Math.max(1, (quantity[selectedProduct.id] || 1) - 1) })}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe7e2] hover:bg-[#f5faf6]"
-                    >
-                      −
-                    </button>
-                    <span className="w-8 text-center text-lg font-bold">{quantity[selectedProduct.id] || 1}</span>
-                    <button
-                      onClick={() => setQuantity({ ...quantity, [selectedProduct.id]: (quantity[selectedProduct.id] || 1) + 1 })}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#dfe7e2] hover:bg-[#f5faf6]"
-                    >
-                      +
-                    </button>
-                  </div>
+              {/* Add to Basket footer */}
+              <div className="mt-8 flex items-center gap-4 border-t border-[#dfe7e2] pt-6">
+                <div className="flex items-center rounded-2xl border border-[#dfe7e2] bg-[#fafafa] p-1">
+                  <button
+                    onClick={() =>
+                      setQuantity({
+                        ...quantity,
+                        [selectedProduct.id]: Math.max(1, (quantity[selectedProduct.id] || 1) - 1),
+                      })
+                    }
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-base font-bold shadow-sm transition hover:bg-[#edf6ee]"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center font-syne font-bold text-[#16231a]">
+                    {quantity[selectedProduct.id] || 1}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setQuantity({
+                        ...quantity,
+                        [selectedProduct.id]: (quantity[selectedProduct.id] || 1) + 1,
+                      })
+                    }
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-base font-bold shadow-sm transition hover:bg-[#edf6ee]"
+                  >
+                    +
+                  </button>
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => {
-                    const pkg = selectedPackaging[selectedProduct.id] || (selectedProduct.packaging?.[0] || '1 unit')
+                    const pkg =
+                      selectedPackaging[selectedProduct.id] || (selectedProduct.packaging?.[0] || '1 unit')
                     handleAddToCart(selectedProduct, pkg, quantity[selectedProduct.id] || 1)
                     setShowModal(false)
                   }}
-                  className="w-full rounded-lg bg-[#2f7a4f] px-6 py-4 text-lg font-bold text-white shadow-sm hover:bg-[#266e45] transition"
+                  className="flex-1 rounded-2xl bg-[#2f7a4f] py-3.5 text-center font-syne text-sm font-bold text-white shadow-lg shadow-[#2f7a4f]/25 transition hover:bg-[#256340] active:scale-[0.99]"
                 >
-                  Add to Basket
+                  Add to Basket →
                 </button>
               </div>
             </div>
@@ -292,298 +303,370 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <main className="mx-auto max-w-[1280px] px-6 py-8 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[220px_1fr_280px]">
-          {/* Left Sidebar - Categories & Filters */}
-          <aside className="space-y-5">
-            {/* All Categories */}
-            <div className="rounded-[18px] border border-[#dfe7e2] bg-white p-3.5 shadow-sm">
-              <button className="mb-3 flex w-full items-center justify-center rounded-full bg-[#2f7a4f] px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-[#266e45]">
-                All Categories
-              </button>
+      {/* Hero Header Banner */}
+      <section className="border-b border-[#dfe7e2] bg-white px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-[#2f7a4f]/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#2f7a4f]">
+                  Kigali Fresh Market
+                </span>
+                <span className="text-xs font-semibold text-[#5a6762]">• Direct from local vendors</span>
+              </div>
+              <h1 className="mt-2 font-syne text-3xl font-black tracking-tight text-[#16231a] sm:text-4xl">
+                {activeCategoryTitle}
+              </h1>
+              <p className="mt-1 text-sm text-[#5a6762]">
+                Showing {filteredProducts.length} certified items ready for same-day delivery across Kigali.
+              </p>
+            </div>
 
-              <div className="space-y-1">
-                {data.categories.map((category) => {
-                  const isSelected = filters.category === category.id
+            {/* Quick Search Bar */}
+            <div className="relative w-full md:w-80">
+              <input
+                type="text"
+                placeholder="Search tomatoes, fish, rice…"
+                value={filters.searchQuery}
+                onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
+                className="w-full rounded-full border border-[#dfe7e2] bg-[#f8faf8] py-2.5 pl-10 pr-4 text-sm font-medium outline-none transition focus:border-[#2f7a4f] focus:bg-white focus:ring-2 focus:ring-[#2f7a4f]/20"
+              />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#5a6762]">🔍</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
+      {/* Main Content Layout */}
+      <main className="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[260px_1fr_300px]">
+          {/* Left Filters Sidebar */}
+          <aside className="space-y-6">
+            {/* Categories */}
+            <div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-sm">
+              <h3 className="font-syne text-sm font-black uppercase tracking-wider text-[#16231a]">Categories</h3>
+
+              <div className="mt-3 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setFilters((prev) => ({ ...prev, category: 'all' }))}
+                  className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition ${
+                    filters.category === 'all'
+                      ? 'bg-[#2f7a4f] text-white shadow-sm'
+                      : 'text-[#5a6762] hover:bg-[#edf6ee] hover:text-[#2f7a4f]'
+                  }`}
+                >
+                  <span>🛒 All Categories</span>
+                  <span className="text-[10px] opacity-80">{data.featured.length}</span>
+                </button>
+
+                {data.categories.map((cat) => {
+                  const isSelected = filters.category === cat.id
+                  const count = data.featured.filter((p) => p.category === cat.id).length
                   return (
                     <button
-                      key={category.id}
-                      onClick={() => setFilters({ ...filters, category: category.id })}
-                      className={`flex w-full items-center gap-2 rounded-xl p-2 text-left transition ${
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setFilters((prev) => ({ ...prev, category: cat.id }))}
+                      className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition ${
                         isSelected
-                          ? 'bg-[#edf6ee] text-[#2f7a4f] ring-1 ring-[#c9dfce]'
-                          : 'text-[#52645a] hover:bg-[#f5faf6] hover:text-[#2f7a4f]'
+                          ? 'bg-[#2f7a4f] text-white shadow-sm'
+                          : 'text-[#5a6762] hover:bg-[#edf6ee] hover:text-[#2f7a4f]'
                       }`}
                     >
-                      <img
-                        src={category.image}
-                        alt=""
-                        className="h-7 w-7 shrink-0 rounded-lg object-cover"
-                      />
-                      <span className="flex-1 text-[10px] font-semibold leading-4">
-                        {category.name}
-                      </span>
-                      {isSelected && <span className="ml-auto text-xs font-black text-[#2f7a4f]">✓</span>}
+                      <span className="truncate">{cat.name}</span>
+                      <span className="text-[10px] opacity-80">{count}</span>
                     </button>
                   )
                 })}
               </div>
             </div>
 
-            {/* Market/Supermarket Filter */}
-            <div className="rounded-[24px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-bold text-[#1e2a22]">Market / Supermarket</h3>
-              <div className="space-y-2">
-                {['Kimironko Market', 'Nyabugogo Market', 'Simba Supermarket', 'Quality Supermarket'].map((market) => (
-                  <label key={market} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="rounded border-[#dfe9e1] accent-[#2f7a4f]"
-                      checked={filters.market === market}
-                      onChange={(e) => setFilters({ ...filters, market: e.target.checked ? market : '' })}
-                    />
-                    <span className="text-sm text-[#5a6762]">{market}</span>
-                  </label>
-                ))}
+            {/* Markets Filter */}
+            <div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-sm">
+              <h3 className="font-syne text-sm font-black uppercase tracking-wider text-[#16231a]">Market Vendors</h3>
+              <div className="mt-3 space-y-2 text-xs font-semibold text-[#5a6762]">
+                {['', 'Kimironko Market', 'Nyabugogo Market', 'Simba Supermarket', 'Quality Supermarket'].map(
+                  (m) => (
+                    <label
+                      key={m || 'all'}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg p-1 transition hover:text-[#2f7a4f]"
+                    >
+                      <input
+                        type="radio"
+                        name="marketFilter"
+                        checked={filters.market === m}
+                        onChange={() => setFilters((prev) => ({ ...prev, market: m }))}
+                        className="accent-[#2f7a4f]"
+                      />
+                      <span>{m || 'All Kigali Markets'}</span>
+                    </label>
+                  ),
+                )}
               </div>
             </div>
 
-            {/* Availability Filter */}
-            <div className="rounded-[24px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-bold text-[#1e2a22]">Availability</h3>
-              <div className="space-y-2">
-                {['Available today', 'Low stock', 'Out of stock'].map((status) => (
-                  <label key={status} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="rounded border-[#dfe9e1] accent-[#2f7a4f]"
-                      onChange={(e) => setFilters({ ...filters, availability: e.target.checked ? status : '' })}
-                    />
-                    <span className="text-sm text-[#5a6762]">{status}</span>
-                  </label>
-                ))}
+            {/* Price Max Slider */}
+            <div className="rounded-[24px] border border-[#dfe7e2] bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="font-syne text-sm font-black uppercase tracking-wider text-[#16231a]">Max Price</h3>
+                <span className="text-xs font-bold text-[#2f7a4f]">{filters.priceMax.toLocaleString()} RWF</span>
               </div>
-            </div>
-
-            {/* Price Range Filter */}
-            <div className="rounded-[24px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-bold text-[#1e2a22]">Price Range</h3>
-              <div className="space-y-3">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="rounded border-[#dfe9e1] accent-[#2f7a4f]"
-                  />
-                  <span className="text-sm text-[#5a6762]">Under 2,000 RWF</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="rounded border-[#dfe9e1] accent-[#2f7a4f]"
-                  />
-                  <span className="text-sm text-[#5a6762]">2,000 - 5,000 RWF</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="rounded border-[#dfe9e1] accent-[#2f7a4f]"
-                  />
-                  <span className="text-sm text-[#5a6762]">Above 5,000 RWF</span>
-                </label>
+              <input
+                type="range"
+                min={1000}
+                max={30000}
+                step={500}
+                value={filters.priceMax}
+                onChange={(e) => setFilters((prev) => ({ ...prev, priceMax: Number(e.target.value) }))}
+                className="mt-3 w-full accent-[#2f7a4f]"
+              />
+              <div className="mt-1 flex justify-between text-[10px] font-bold text-[#8a9e93]">
+                <span>1,000 RWF</span>
+                <span>30,000 RWF</span>
               </div>
             </div>
           </aside>
 
-          {/* Main Content Area */}
-          <div className="space-y-5">
-            {/* Category Header */}
-            <section className="rounded-[26px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <div className="mb-3">
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2f7a4f]">Fresh picks</p>
-                <h1 className="mt-2 text-3xl font-black tracking-[-0.05em] text-[#1e2a22]">{currentCategory?.name}</h1>
-                <p className="mt-2 text-sm text-[#5a6762]">{filteredProducts.length} items available today</p>
-              </div>
+          {/* Center Products Grid */}
+          <div>
+            {/* Sorting & Filter summary bar */}
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dfe7e2] bg-white p-4 shadow-sm">
+              <span className="text-xs font-bold text-[#5a6762]">
+                Showing <strong className="text-[#16231a]">{filteredProducts.length}</strong> fresh items
+              </span>
 
-              {/* Subcategories */}
-              {subcategories.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button className="rounded-full border border-[#dfe7e2] bg-[#f9faf8] px-4 py-2 text-sm font-medium text-[#23372f] shadow-sm hover:border-[#2f7a4f] hover:bg-[#ebf7ef] hover:text-[#2f7a4f]">
-                    All
-                  </button>
-                  {subcategories.map((sub) => (
-                    <button
-                      key={sub}
-                      className="rounded-full border border-[#dfe7e2] bg-[#f9faf8] px-4 py-2 text-sm font-medium text-[#23372f] shadow-sm hover:border-[#2f7a4f] hover:bg-[#ebf7ef] hover:text-[#2f7a4f]"
-                    >
-                      {sub}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Sort & View Options */}
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-[#5a6762]">Sort by:</label>
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="text-[#5a6762]">Sort by:</span>
                 <select
                   value={filters.sortBy}
-                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
-                  className="rounded-full border border-[#dfe7e2] bg-white px-3 py-1.5 text-sm font-medium text-[#1e2a22] shadow-sm hover:border-[#2f7a4f]"
+                  onChange={(e) => setFilters((prev) => ({ ...prev, sortBy: e.target.value as any }))}
+                  className="rounded-xl border border-[#dfe7e2] bg-[#fafafa] px-3 py-1.5 font-bold text-[#1e2a22] outline-none transition focus:border-[#2f7a4f]"
                 >
-                  <option value="popular">Popular</option>
-                  <option value="low-to-high">Price: Low to High</option>
-                  <option value="high-to-low">Price: High to Low</option>
-                  <option value="newest">Newest</option>
+                  <option value="popular">🔥 Most Popular</option>
+                  <option value="rating">⭐ Highest Rated</option>
+                  <option value="low-to-high">💵 Price: Low to High</option>
+                  <option value="high-to-low">💎 Price: High to Low</option>
                 </select>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[#5a6762]">View:</span>
-                <button className="rounded-lg border border-[#2f7a4f] bg-[#2f7a4f] px-3 py-2 text-sm text-white">
-                  Grid
-                </button>
-                <button className="rounded-lg border border-[#dfe7e2] bg-white px-3 py-2 text-sm text-[#1e2a22] hover:border-[#2f7a4f]">
-                  List
+            </div>
+
+            {/* Empty State */}
+            {filteredProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-[28px] border border-[#dfe7e2] bg-white p-12 text-center shadow-sm">
+                <span className="text-4xl">🥬</span>
+                <h3 className="mt-3 font-syne text-xl font-black text-[#16231a]">No products found</h3>
+                <p className="mt-1 text-sm text-[#5a6762]">Try adjusting your search query, price filter, or category.</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters({
+                      category: 'all',
+                      market: '',
+                      searchQuery: '',
+                      availability: '',
+                      priceMax: 25000,
+                      sortBy: 'popular',
+                    })
+                  }
+                  className="mt-5 rounded-full bg-[#2f7a4f] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#256340]"
+                >
+                  Reset All Filters
                 </button>
               </div>
-            </div>
+            ) : (
+              /* Product Cards Grid */
+              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredProducts.map((product) => {
+                  const qty = quantity[product.id] || 1
+                  const chosenPkg = selectedPackaging[product.id] || (product.packaging?.[0] || '1 unit')
 
-            {/* Product Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredProducts.map((product) => (
-                <article
-                  key={product.id}
-                  className="flex flex-col overflow-hidden rounded-[18px] border border-[#e5e9e4] bg-white shadow-sm transition hover:shadow-md cursor-pointer"
-                  onClick={() => {
-                    setSelectedProduct(product)
-                    setShowModal(true)
-                  }}
-                >
-                  {/* Product Image */}
-                  <div className="relative h-32 w-full overflow-hidden bg-[#f5faf6]">
-                    <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-                    {product.badge && (
-                      <div className="absolute right-2 top-2 rounded-full bg-[#2f7a4f] px-2 py-0.5 text-[10px] font-bold text-white">
-                        {product.badge}
-                      </div>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                      }}
-                      className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm shadow-sm transition hover:scale-110"
+                  return (
+                    <article
+                      key={product.id}
+                      className="group flex flex-col overflow-hidden rounded-[24px] border border-[#dfe7e2] bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#2f7a4f]/50 hover:shadow-xl hover:shadow-[#2f7a4f]/10"
                     >
-                      ♡
-                    </button>
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex flex-1 flex-col p-3">
-                    <div className="mb-2">
-                      <h3 className="text-[15px] font-bold leading-tight text-[#1d2f27]">
-                        {product.name}
-                        {product.kinyarwandaName && <span className="text-[11px] font-normal text-[#5a6762]"> / {product.kinyarwandaName}</span>}
-                      </h3>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#2f7a4f]">
-                          {product.freshness}
-                        </span>
-                        {product.badge === 'FARM FRESH' && <span className="text-[10px] text-[#2f7a4f]">• Local</span>}
-                      </div>
-                    </div>
-
-                    {product.details && Object.keys(product.details).length > 0 && (
-                      <div className="mb-2 space-y-0.5 text-[10px] text-[#5a6762]">
-                        {Object.entries(product.details).map(([key, value]) => (
-                          <div key={key}>{key}: <span className="font-medium">{value}</span></div>
-                        ))}
-                      </div>
-                    )}
-
-                    {product.packaging && product.packaging.length > 0 && (
-                      <div className="mb-2 text-[10px] text-[#5a6762]">
-                        Packaging: <span className="font-medium">{product.packaging[0]}</span>
-                      </div>
-                    )}
-
-                    <div className="mb-2 text-[10px] text-[#5a6762]">
-                      <span className="font-medium text-[#1e2a22]">{product.market}</span>
-                      {product.rating && <span className="ml-2">★ {product.rating.toFixed(1)}</span>}
-                    </div>
-
-                    {product.availability && (
-                      <div className="mb-2 inline-block rounded-full bg-[#ebf7ef] px-2 py-0.5 text-[10px] font-medium text-[#2f7a4f]">
-                        {product.availability === 'available' && 'Available today'}
-                        {product.availability === 'limited' && 'Limited availability'}
-                        {product.availability === 'out_of_stock' && 'Out of stock'}
-                      </div>
-                    )}
-
-                    <div
-                      className="mb-3 mt-auto flex items-center justify-between rounded-lg border border-[#dfe7e2] p-1.5"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => setQuantity({ ...quantity, [product.id]: Math.max(1, (quantity[product.id] || 1) - 1) })}
-                        className="flex h-5 w-5 items-center justify-center rounded text-base hover:bg-[#f5faf6]"
-                      >
-                        −
-                      </button>
-                      <span className="text-xs font-semibold">{quantity[product.id] || 1}</span>
-                      <button
-                        onClick={() => setQuantity({ ...quantity, [product.id]: (quantity[product.id] || 1) + 1 })}
-                        className="flex h-5 w-5 items-center justify-center rounded text-base hover:bg-[#f5faf6]"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <div
-                      className="flex items-center justify-between gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div>
-                        <span className="text-lg font-bold text-[#1e2a22]">{product.price}</span>
-                        {product.priceUnit && <span className="text-[10px] text-[#5a6762]"> {product.priceUnit}</span>}
-                      </div>
-                      <button
+                      {/* Image container */}
+                      <div
+                        className="relative h-48 w-full cursor-pointer overflow-hidden bg-[#edf6ee]"
                         onClick={() => {
-                          const pkg = selectedPackaging[product.id] || (product.packaging?.[0] || '1 unit')
-                          handleAddToCart(product, pkg, quantity[product.id] || 1)
+                          setSelectedProduct(product)
+                          setShowModal(true)
                         }}
-                        className="flex-1 rounded-lg bg-[#2f7a4f] px-2.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#266e45]"
                       >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        {product.badge && (
+                          <span className="absolute left-3 top-3 rounded-full bg-[#2f7a4f] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                            {product.badge}
+                          </span>
+                        )}
+                        <span className="absolute bottom-3 right-3 rounded-full bg-white/90 px-2.5 py-0.5 text-[10px] font-bold text-[#16231a] shadow-sm backdrop-blur-sm">
+                          📍 {product.market}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex flex-1 flex-col p-5">
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setSelectedProduct(product)
+                            setShowModal(true)
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2f7a4f]">
+                              {product.freshness ?? 'Fresh'}
+                            </span>
+                            <span className="text-[11px] font-bold text-amber-600">
+                              ★ {product.rating?.toFixed(1) ?? '4.8'}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-1.5 font-syne text-base font-black leading-snug text-[#16231a] group-hover:text-[#2f7a4f] transition-colors">
+                            {product.name}
+                          </h3>
+
+                          {product.kinyarwandaName && (
+                            <p className="text-xs font-medium text-[#718578]">{product.kinyarwandaName}</p>
+                          )}
+                        </div>
+
+                        {/* Price & Packaging */}
+                        <div className="mt-4 flex items-baseline justify-between border-t border-[#f0f4f1] pt-3">
+                          <div>
+                            <span className="font-syne text-lg font-black text-[#16231a]">
+                              {parseInt(product.price, 10).toLocaleString()} RWF
+                            </span>
+                            <span className="ml-1 text-[11px] font-semibold text-[#718578]">
+                              {product.priceUnit ?? ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quick Add Controller */}
+                        <div className="mt-4 flex items-center gap-2">
+                          <div className="flex items-center rounded-xl border border-[#dfe7e2] bg-[#f8faf8] p-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuantity({
+                                  ...quantity,
+                                  [product.id]: Math.max(1, (quantity[product.id] || 1) - 1),
+                                })
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-[#16231a] shadow-xs transition hover:bg-[#edf6ee]"
+                            >
+                              −
+                            </button>
+                            <span className="w-7 text-center font-syne text-xs font-bold text-[#16231a]">
+                              {qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setQuantity({
+                                  ...quantity,
+                                  [product.id]: (quantity[product.id] || 1) + 1,
+                                })
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-[#16231a] shadow-xs transition hover:bg-[#edf6ee]"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(product, chosenPkg, qty)}
+                            className="flex-1 rounded-xl bg-[#2f7a4f] py-2.5 text-center font-syne text-xs font-bold text-white shadow-md shadow-[#2f7a4f]/20 transition hover:bg-[#256340] active:scale-95"
+                          >
+                            Add to Basket
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Right Sidebar - Support & Info */}
+          {/* Right Sidebar - Live Smart Basket & Delivery */}
           <aside className="space-y-6">
-            <div className="rounded-[24px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-bold text-[#1e2a22]">Need help ordering?</h3>
-              <p className="mb-4 text-sm text-[#5a6762]">Call us toll free</p>
-              <div className="mb-4 rounded-lg bg-[#2f7a4f] px-3 py-2">
-                <p className="text-lg font-bold text-white">0800 1234</p>
-                <p className="text-xs text-[#ebf7ef]">Everyday: 7AM – 8PM</p>
+            {/* Live Basket Quick View */}
+            <div className="rounded-[28px] border border-[#dfe7e2] bg-white p-6 shadow-md shadow-black/5">
+              <div className="flex items-center justify-between">
+                <h3 className="font-syne text-base font-black text-[#16231a]">Smart Basket</h3>
+                <span className="rounded-full bg-[#2f7a4f] px-2.5 py-0.5 font-syne text-xs font-bold text-white">
+                  {cartItemCount}
+                </span>
               </div>
-              <button className="w-full rounded-lg border border-[#2f7a4f] bg-white px-3 py-2 text-sm font-semibold text-[#2f7a4f] hover:bg-[#ebf7ef]">
-                Chat on WhatsApp
-              </button>
+
+              {cartItems.length === 0 ? (
+                <div className="my-6 rounded-2xl bg-[#fafafa] p-6 text-center text-xs text-[#5a6762]">
+                  <p className="font-bold text-[#16231a]">Your basket is empty</p>
+                  <p className="mt-1">Add items from the store to see live checkout calculations.</p>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <div className="max-h-56 space-y-2 overflow-y-auto pr-1 text-xs">
+                    {cartItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between rounded-xl bg-[#f8faf8] p-2.5"
+                      >
+                        <div className="max-w-[150px] truncate">
+                          <p className="font-bold text-[#16231a] truncate">{item.name}</p>
+                          <p className="text-[10px] text-[#718578]">Qty: {item.quantity}</p>
+                        </div>
+                        <span className="font-syne font-bold text-[#2f7a4f]">
+                          {(item.price * item.quantity).toLocaleString()} RWF
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-[#dfe7e2] pt-4">
+                    <div className="flex justify-between text-xs text-[#5a6762]">
+                      <span>Subtotal</span>
+                      <span className="font-bold text-[#16231a]">{cartTotal.toLocaleString()} RWF</span>
+                    </div>
+                    <div className="mt-1 flex justify-between text-xs text-[#5a6762]">
+                      <span>Est. Kigali Delivery</span>
+                      <span className="font-bold text-emerald-600">2,000 RWF</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/checkout')}
+                    className="mt-2 w-full rounded-2xl bg-[#2f7a4f] py-3 text-center font-syne text-xs font-bold text-white shadow-lg shadow-[#2f7a4f]/25 transition hover:bg-[#256340] active:scale-[0.99]"
+                  >
+                    Proceed to Checkout →
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Trust Section */}
-            <div className="rounded-[24px] border border-[#dfe6e0] bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-sm font-bold text-[#1e2a22]">Fresh from trusted markets</h3>
-              <p className="text-sm text-[#5a6762]">Quality you can trust, carefully selected and delivered to your doorstep.</p>
-              <button className="mt-4 w-full rounded-lg bg-[#ebf7ef] px-3 py-2 text-sm font-semibold text-[#2f7a4f] hover:bg-[#dfeee5]">
-                Learn more →
-              </button>
+            {/* Delivery Guarantee Card */}
+            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-[#edf6ee] to-[#dcf0e0] p-6 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚡</span>
+                <h4 className="font-syne text-sm font-black text-[#16231a]">Guaranteed Kigali Delivery</h4>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-[#41544a]">
+                Orders placed before 4:00 PM are delivered same-day directly to your doorstep in Nyarugenge, Gasabo, or Kicukiro.
+              </p>
+              <div className="mt-4 flex items-center gap-2 text-[11px] font-bold text-[#2f7a4f]">
+                <span>✓ Verified fresh</span>
+                <span>•</span>
+                <span>✓ Cold-chain packed</span>
+              </div>
             </div>
           </aside>
         </div>
