@@ -99,7 +99,7 @@ class RequestOTPView(generics.GenericAPIView):
             otp = AccountService.resend_otp(serializer.validated_data['email'])
         except ValidationError as exc:
             return Response(build_error_response(str(exc), status=400)[0], status=400)
-        return Response(build_success_response('OTP sent successfully.', {'otp': otp})[0], status=200)
+        return Response(build_success_response('OTP sent to your email address.')[0], status=200)
 
 
 class VerifyOTPView(generics.GenericAPIView):
@@ -127,7 +127,7 @@ class ForgotPasswordView(generics.GenericAPIView):
             otp = AccountService.resend_otp(serializer.validated_data['email'])
         except ValidationError as exc:
             return Response(build_error_response(str(exc), status=400)[0], status=400)
-        return Response(build_success_response('Password reset OTP sent.', {'otp': otp})[0], status=200)
+        return Response(build_success_response('Password reset OTP sent to your email address.')[0], status=200)
 
 
 class ResetPasswordView(generics.GenericAPIView):

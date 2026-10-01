@@ -1,36 +1,64 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import { loginUserRequest, logoutUserRequest, registerUserRequest, type AuthResponse } from './authAPI';
+import {
+  loginUserRequest,
+  logoutUserRequest,
+  registerUserRequest,
+  verifyOTPRequest,
+  resendOTPRequest,
+  getProfileRequest,
+  refreshTokenRequest,
+  type AuthResponse,
+} from './authAPI';
 import type { AuthState, AuthUser, LoginPayload, RegisterPayload } from './authTypes';
 
+// ─── Token persistence keys ───────────────────────────────────────────────────
+const ACCESS_KEY  = 'tomiland_access';
+const REFRESH_KEY = 'tomiland_refresh';
+
+const saveTokens = (access: string, refresh: string) => {
+  localStorage.setItem(ACCESS_KEY, access);
+  localStorage.setItem(REFRESH_KEY, refresh);
+};
+
+const clearTokens = () => {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+};
+
+// ─── Initial state ────────────────────────────────────────────────────────────
 const initialState: AuthState = {
   user: null,
-  token: null,
+  accessToken: localStorage.getItem(ACCESS_KEY),
+  refreshToken: localStorage.getItem(REFRESH_KEY),
   isAuthenticated: false,
+  pendingVerification: false,
+  pendingEmail: null,
   status: 'idle',
   error: null,
 };
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : 'An unexpected error occurred.';
 
-  return 'Unable to complete the authentication request.';
-};
+// ─── Thunks ───────────────────────────────────────────────────────────────────
 
+/** Login with email + password → get JWT tokens */
 export const loginUser = createAsyncThunk<AuthResponse, LoginPayload, { rejectValue: string }>(
   'auth/login',
   async (payload, { rejectWithValue }) => {
     try {
-      return await loginUserRequest(payload);
+      const response = await loginUserRequest(payload);
+      saveTokens(response.accessToken, response.refreshToken);
+      return response;
     } catch (error) {
       return rejectWithValue(getErrorMessage(error));
     }
   },
 );
 
-export const registerUser = createAsyncThunk<AuthResponse, RegisterPayload, { rejectValue: string }>(
+/** Register new account → triggers OTP email, does NOT log in yet */
+export const registerUser = createAsyncThunk<{ userId: string; email: string }, RegisterPayload, { rejectValue: string }>(
   'auth/register',
   async (payload, { rejectWithValue }) => {
     try {
@@ -41,76 +69,169 @@ export const registerUser = createAsyncThunk<AuthResponse, RegisterPayload, { re
   },
 );
 
-export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
-  'auth/logout',
-  async (_, { rejectWithValue }) => {
+/** Verify OTP code sent to email after registration */
+export const verifyOTP = createAsyncThunk<void, { email: string; otp: string }, { rejectValue: string }>(
+  'auth/verifyOTP',
+  async ({ email, otp }, { rejectWithValue }) => {
     try {
-      await logoutUserRequest();
+      await verifyOTPRequest(email, otp);
     } catch (error) {
       return rejectWithValue(getErrorMessage(error));
     }
   },
 );
 
+/** Resend OTP to email */
+export const resendOTP = createAsyncThunk<void, string, { rejectValue: string }>(
+  'auth/resendOTP',
+  async (email, { rejectWithValue }) => {
+    try {
+      await resendOTPRequest(email);
+    } catch (error) {
+      return rejectWithValue(getErrorMessage(error));
+    }
+  },
+);
+
+/** Logout — blacklists refresh token on the backend */
+export const logoutUser = createAsyncThunk<void, void, { rejectValue: string }>(
+  'auth/logout',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = (getState() as { auth: AuthState }).auth;
+      if (state.refreshToken) {
+        await logoutUserRequest(state.refreshToken);
+      }
+      clearTokens();
+    } catch (error) {
+      clearTokens(); // Always clear locally
+      return rejectWithValue(getErrorMessage(error));
+    }
+  },
+);
+
+/** Restore session from localStorage access token on app load */
+export const restoreSession = createAsyncThunk<AuthUser, void, { rejectValue: string }>(
+  'auth/restoreSession',
+  async (_, { rejectWithValue }) => {
+    try {
+      const access = localStorage.getItem(ACCESS_KEY);
+      const refresh = localStorage.getItem(REFRESH_KEY);
+      if (!access || !refresh) throw new Error('No stored session');
+
+      // Try fetching profile with stored access token
+      try {
+        return await getProfileRequest(access);
+      } catch {
+        // Access token expired — try refreshing it
+        const newAccess = await refreshTokenRequest(refresh);
+        localStorage.setItem(ACCESS_KEY, newAccess);
+        return await getProfileRequest(newAccess);
+      }
+    } catch (error) {
+      clearTokens();
+      return rejectWithValue(getErrorMessage(error));
+    }
+  },
+);
+
+// ─── Slice ────────────────────────────────────────────────────────────────────
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    clearAuthError: (state) => {
-      state.error = null;
-    },
-    setSession: (state, action: PayloadAction<{ user: AuthUser; token: string }>) => {
+    clearAuthError: (state) => { state.error = null; },
+    resetAuth: () => { clearTokens(); return initialState; },
+    setSession: (state, action: PayloadAction<{ user: AuthUser; accessToken: string; refreshToken: string }>) => {
       state.user = action.payload.user;
-      state.token = action.payload.token;
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
       state.isAuthenticated = true;
       state.status = 'succeeded';
       state.error = null;
+      saveTokens(action.payload.accessToken, action.payload.refreshToken);
     },
-    resetAuth: () => initialState,
   },
   extraReducers: (builder) => {
+    // ── LOGIN ──────────────────────────────────────────────────────────────
     builder
-      .addCase(loginUser.pending, (state) => {
-        state.status = 'loading';
-        state.error = null;
-      })
+      .addCase(loginUser.pending, (state) => { state.status = 'loading'; state.error = null; })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.user = action.payload.user;
-        state.token = action.payload.token;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
+        state.pendingVerification = false;
+        state.pendingEmail = null;
         state.status = 'succeeded';
         state.error = null;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload ?? 'Unable to log in.';
-      })
-      .addCase(registerUser.pending, (state) => {
-        state.status = 'loading';
-        state.error = null;
-      })
+        state.error = action.payload ?? 'Login failed. Please check your credentials.';
+      });
+
+    // ── REGISTER ───────────────────────────────────────────────────────────
+    builder
+      .addCase(registerUser.pending, (state) => { state.status = 'loading'; state.error = null; })
       .addCase(registerUser.fulfilled, (state, action) => {
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.isAuthenticated = true;
         state.status = 'succeeded';
+        state.pendingVerification = true;
+        state.pendingEmail = action.payload.email;
         state.error = null;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload ?? 'Unable to register.';
+        state.error = action.payload ?? 'Registration failed. Please try again.';
+      });
+
+    // ── VERIFY OTP ─────────────────────────────────────────────────────────
+    builder
+      .addCase(verifyOTP.pending, (state) => { state.status = 'loading'; state.error = null; })
+      .addCase(verifyOTP.fulfilled, (state) => {
+        state.status = 'succeeded';
+        state.pendingVerification = false;
+        // User must log in after verifying OTP
       })
-      .addCase(logoutUser.pending, (state) => {
-        state.status = 'loading';
-      })
-      .addCase(logoutUser.fulfilled, () => initialState)
-      .addCase(logoutUser.rejected, (state, action) => {
+      .addCase(verifyOTP.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload ?? 'Unable to log out.';
+        state.error = action.payload ?? 'OTP verification failed.';
+      });
+
+    // ── RESEND OTP ─────────────────────────────────────────────────────────
+    builder
+      .addCase(resendOTP.pending, (state) => { state.status = 'loading'; state.error = null; })
+      .addCase(resendOTP.fulfilled, (state) => { state.status = 'succeeded'; })
+      .addCase(resendOTP.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload ?? 'Failed to resend OTP.';
+      });
+
+    // ── LOGOUT ─────────────────────────────────────────────────────────────
+    builder
+      .addCase(logoutUser.pending, (state) => { state.status = 'loading'; })
+      .addCase(logoutUser.fulfilled, () => { clearTokens(); return { ...initialState, accessToken: null, refreshToken: null }; })
+      .addCase(logoutUser.rejected, () => { clearTokens(); return { ...initialState, accessToken: null, refreshToken: null }; });
+
+    // ── RESTORE SESSION ────────────────────────────────────────────────────
+    builder
+      .addCase(restoreSession.pending, (state) => { state.status = 'loading'; })
+      .addCase(restoreSession.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        state.status = 'succeeded';
+        state.error = null;
+      })
+      .addCase(restoreSession.rejected, (state) => {
+        state.user = null;
+        state.isAuthenticated = false;
+        state.accessToken = null;
+        state.refreshToken = null;
+        state.status = 'idle';
+        state.error = null;
       });
   },
 });
 
 export const { clearAuthError, setSession, resetAuth } = authSlice.actions;
-
 export default authSlice.reducer;

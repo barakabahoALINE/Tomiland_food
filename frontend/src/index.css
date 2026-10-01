@@ -1,7 +1,186 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Syne:wght@700;800&display=swap');
 @import "tailwindcss";
 @config "../tailwind.config.cjs";
 
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+  --green-50:  #f0faf4;
+  --green-100: #dcf3e7;
+  --green-200: #b9e7cf;
+  --green-500: #2f7a4f;
+  --green-600: #256940;
+  --green-700: #1b5733;
+  --cream:     #f7f3ec;
+  --cream-dark:#ede8df;
+  --ink:       #0f1f18;
+  --ink-light: #3a4f44;
+  --muted:     #6b7e73;
 
+  --radius-card: 28px;
+  --shadow-card: 0 4px 24px rgba(15,31,24,.07);
+  --shadow-hover: 0 16px 48px rgba(15,31,24,.14);
+  --shadow-float: 0 24px 64px rgba(15,31,24,.18);
+
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-out:    cubic-bezier(.22,1,.36,1);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ─── Scroll-reveal animation classes ───────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity .7s var(--ease-out), transform .7s var(--ease-out);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: opacity .7s var(--ease-out), transform .7s var(--ease-out);
+}
+.reveal-left.visible { opacity: 1; transform: translateX(0); }
+
+.reveal-scale {
+  opacity: 0;
+  transform: scale(.92);
+  transition: opacity .6s var(--ease-out), transform .6s var(--ease-spring);
+}
+.reveal-scale.visible { opacity: 1; transform: scale(1); }
+
+/* stagger children */
+.stagger > *:nth-child(1) { transition-delay: .05s; }
+.stagger > *:nth-child(2) { transition-delay: .12s; }
+.stagger > *:nth-child(3) { transition-delay: .19s; }
+.stagger > *:nth-child(4) { transition-delay: .26s; }
+.stagger > *:nth-child(5) { transition-delay: .33s; }
+.stagger > *:nth-child(6) { transition-delay: .40s; }
+.stagger > *:nth-child(7) { transition-delay: .47s; }
+
+/* ─── Glass card ─────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.55);
+}
+
+/* ─── Premium card hover ─────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform .35s var(--ease-spring), box-shadow .35s var(--ease-out), border-color .2s;
+  will-change: transform;
+}
+.card-hover:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--green-200);
+}
+
+/* ─── Shimmer skeleton ───────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #e8e2d9 25%, #f2ede6 50%, #e8e2d9 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 12px;
+}
+
+/* ─── Button pulse ───────────────────────────────────────────────────────── */
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47,122,79,.4); }
+  50%       { box-shadow: 0 0 0 10px rgba(47,122,79,0); }
+}
+.btn-pulse { animation: pulse-green 2.4s ease-in-out infinite; }
+
+/* ─── Float badge ────────────────────────────────────────────────────────── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+.float { animation: float 3.5s ease-in-out infinite; }
+
+/* ─── Gradient text ──────────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #1b5733 0%, #2f7a4f 50%, #38a169 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Shine button ───────────────────────────────────────────────────────── */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.25) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform .5s var(--ease-out);
+}
+.btn-shine:hover::after { transform: translateX(100%); }
+
+/* ─── Tag badge ──────────────────────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: var(--green-100);
+  color: var(--green-600);
+  border: 1px solid var(--green-200);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--green-200); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--green-500); }
+
+/* ─── Selection ──────────────────────────────────────────────────────────── */
+::selection { background: var(--green-100); color: var(--green-700); }
+
+/* ─── Focus ring ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* ─── Ticker / marquee ───────────────────────────────────────────────────── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track { animation: ticker 22s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
+
+/* ─── Spin loader ────────────────────────────────────────────────────────── */
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+.spin-slow { animation: spin-slow 1.2s linear infinite; }
